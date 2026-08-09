@@ -1,0 +1,271 @@
+:root {
+  color-scheme: light dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 330px;
+  margin: 0;
+  color: #202124;
+  background: #f8fafd;
+}
+
+input {
+  font: inherit;
+}
+
+.popup-shell {
+  padding: 18px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 13px;
+  color: #fff;
+  font-size: 23px;
+  background: linear-gradient(135deg, #078efb, #7c4dff 70%, #d965ff);
+  box-shadow: 0 8px 22px rgb(90 75 218 / 22%);
+}
+
+h1,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.header p {
+  margin-top: 2px;
+  color: #68717f;
+  font-size: 12px;
+}
+
+fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  margin-bottom: 8px;
+  color: #68717f;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.model-list {
+  display: grid;
+  gap: 8px;
+}
+
+.model-option,
+.thinking-option {
+  display: flex;
+  align-items: center;
+  border: 1px solid #dfe3eb;
+  background: #fff;
+}
+
+.model-option {
+  position: relative;
+  gap: 12px;
+  padding: 12px 13px;
+  border-radius: 13px;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.model-option:hover {
+  border-color: #9bbcff;
+  background: #f9fbff;
+}
+
+.model-option:has(input:checked) {
+  border-color: #6b8cff;
+  background: #f2f6ff;
+  box-shadow: 0 0 0 1px #6b8cff inset;
+}
+
+.model-option input,
+.switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.radio-indicator {
+  display: grid;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 2px solid #9aa2ae;
+  border-radius: 50%;
+}
+
+.model-option input:checked + .radio-indicator {
+  border-color: #526ff3;
+}
+
+.model-option input:checked + .radio-indicator::after {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #526ff3;
+  content: "";
+}
+
+.model-option:focus-within,
+.thinking-option:focus-within {
+  outline: 3px solid rgb(82 111 243 / 28%);
+  outline-offset: 2px;
+}
+
+.model-copy,
+.thinking-option > strong {
+  display: block;
+}
+
+.model-copy strong,
+.thinking-option strong {
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.thinking-option {
+  justify-content: space-between;
+  margin-top: 12px;
+  padding: 13px;
+  border-radius: 13px;
+  cursor: pointer;
+}
+
+.switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 24px;
+}
+
+.switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #aeb5bf;
+  transition: background-color 150ms ease;
+}
+
+.switch-track::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 24%);
+  content: "";
+  transition: transform 150ms ease;
+}
+
+.switch input:checked + .switch-track {
+  background: #526ff3;
+}
+
+.switch input:checked + .switch-track::after {
+  transform: translateX(18px);
+}
+
+.status {
+  min-height: 17px;
+  margin-top: 10px;
+  color: #68717f;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.status[data-kind="error"] {
+  color: #b3261e;
+}
+
+.status[data-kind="success"] {
+  color: #137333;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    color: #e8eaed;
+    background: #17191d;
+  }
+
+  .header p,
+  legend,
+  .status {
+    color: #aeb4bf;
+  }
+
+  .model-option,
+  .thinking-option {
+    border-color: #3b4049;
+    background: #22252a;
+  }
+
+  .model-option:hover {
+    border-color: #738cd8;
+    background: #282c35;
+  }
+
+  .model-option:has(input:checked) {
+    border-color: #8aa2ff;
+    background: #262d45;
+  }
+
+  .status[data-kind="error"] {
+    color: #ffb4ab;
+  }
+
+  .status[data-kind="success"] {
+    color: #81c995;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

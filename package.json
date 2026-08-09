@@ -1,0 +1,9 @@
+{
+  "name": "gemini-default-model-selector",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Chrome extension for keeping a preferred Gemini model and Extended thinking setting.",
+  "scripts": {
+    "check": "node --check shared.js && node --check content.js && node --check popup.js && node --test"
+  }
+}

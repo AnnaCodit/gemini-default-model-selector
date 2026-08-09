@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gemini Default Model Selector</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <main class="popup-shell">
+    <header class="header">
+      <span class="brand-mark" aria-hidden="true">✦</span>
+      <div>
+        <h1>Gemini Default <br>Model Selector</h1>
+      </div>
+    </header>
+    <section id="settings-panel">
+      <fieldset class="model-list">
+        <legend>Choose the model</legend>
+        <label class="model-option">
+          <input type="radio" name="model" value="flash-lite-3.5">
+          <span class="radio-indicator" aria-hidden="true"></span>
+          <span class="model-copy">
+            <strong>3.5 Flash-Lite</strong>
+          </span>
+        </label>
+        <label class="model-option">
+          <input type="radio" name="model" value="flash-3.6">
+          <span class="radio-indicator" aria-hidden="true"></span>
+          <span class="model-copy">
+            <strong>3.6 Flash</strong>
+          </span>
+        </label>
+        <label class="model-option">
+          <input type="radio" name="model" value="pro-3.1">
+          <span class="radio-indicator" aria-hidden="true"></span>
+          <span class="model-copy">
+            <strong>3.1 Pro</strong>
+          </span>
+        </label>
+      </fieldset>
+      <label class="thinking-option">
+        <strong>Extended thinking</strong>
+        <span class="switch">
+          <input id="extended-thinking" type="checkbox">
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+    </section>
+    <p id="status" class="status" role="status" aria-live="polite"> Loading settings… </p>
+  </main>
+  <script src="shared.js"></script>
+  <script src="popup.js"></script>
+</body>
+
+</html>

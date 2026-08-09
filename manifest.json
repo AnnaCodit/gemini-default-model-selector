@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Default Model Selector",
+  "version": "1.1.0",
+  "description": "Automatically applies your preferred Gemini model and Extended thinking setting when Gemini opens.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://gemini.google.com/*"
+  ],
+  "action": {
+    "default_title": "Gemini default model",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "shared.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
