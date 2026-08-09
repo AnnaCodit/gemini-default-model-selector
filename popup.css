@@ -33,15 +33,10 @@ input {
 }
 
 .brand-mark {
-  display: grid;
+  display: block;
   width: 42px;
   height: 42px;
-  place-items: center;
-  border-radius: 13px;
-  color: #fff;
-  font-size: 23px;
-  background: linear-gradient(135deg, #078efb, #7c4dff 70%, #d965ff);
-  box-shadow: 0 8px 22px rgb(90 75 218 / 22%);
+  object-fit: contain;
 }
 
 h1,

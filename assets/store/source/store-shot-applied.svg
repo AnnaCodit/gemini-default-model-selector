@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1280" height="800" viewBox="0 0 1280 800">
+  <defs>
+    <radialGradient id="bottomGlow" cx="0" cy="0" r="1" gradientTransform="translate(850 670) rotate(90) scale(360 480)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4B5BFF" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#4B5BFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="topGlow" cx="0" cy="0" r="1" gradientTransform="translate(250 90) rotate(90) scale(240 330)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C458E8" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#C458E8" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="frameShadow" x="120" y="270" width="1100" height="570" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="24" stdDeviation="26" flood-color="#000000" flood-opacity="0.42"/>
+    </filter>
+    <filter id="badgeShadow" x="900" y="175" width="300" height="100" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#26338B" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="800" fill="#0E1120"/>
+  <rect width="1280" height="800" fill="url(#bottomGlow)"/>
+  <rect width="1280" height="800" fill="url(#topGlow)"/>
+  <image x="88" y="67" width="42" height="42" xlink:href="icon-48.png"/>
+  <text x="144" y="95" fill="#B9C1D8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="650">Gemini Default Model Selector</text>
+  <text x="88" y="183" fill="#F5F7FF" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700" letter-spacing="-1.6">
+    <tspan x="88" dy="0">Your preferred model is ready</tspan>
+    <tspan x="88" dy="58">when Gemini opens.</tspan>
+  </text>
+  <text x="88" y="286" fill="#ADB6CE" font-family="Segoe UI, Arial, sans-serif" font-size="21">Model and Extended thinking are applied automatically.</text>
+  <g filter="url(#frameShadow)">
+    <rect x="166" y="336" width="1026" height="420" rx="24" fill="#18191D" stroke="#424654"/>
+  </g>
+  <path d="M166 360C166 346.745 176.745 336 190 336H1168C1181.25 336 1192 346.745 1192 360V380H166V360Z" fill="#252730"/>
+  <circle cx="192" cy="358" r="5" fill="#626779"/>
+  <circle cx="210" cy="358" r="5" fill="#626779"/>
+  <circle cx="228" cy="358" r="5" fill="#626779"/>
+  <rect x="250" y="347" width="420" height="22" rx="11" fill="#343743"/>
+  <clipPath id="captureClip"><rect x="183" y="395" width="990" height="344" rx="8"/></clipPath>
+  <g clip-path="url(#captureClip)">
+    <rect x="183" y="395" width="990" height="344" fill="#111216"/>
+    <image x="261" y="388" width="900" height="418" xlink:href="gemini-model-menu-crop.png"/>
+  </g>
+  <g filter="url(#badgeShadow)">
+    <rect x="927" y="238" width="249" height="52" rx="26" fill="#526FF3"/>
+  </g>
+  <image x="943" y="251" width="26" height="26" xlink:href="icon-32.png"/>
+  <text x="982" y="271" fill="#EEF1FF" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">Applied automatically</text>
+</svg>

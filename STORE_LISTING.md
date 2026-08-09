@@ -2,7 +2,7 @@
 
 ## Title
 
-Gemini Default Model Selector (UPDATED)
+Gemini Default Model Selector
 
 ## Summary
 
@@ -39,3 +39,12 @@ Remember and apply the user's preferred Gemini model and Extended thinking setti
 ## Privacy disclosure
 
 The extension does not collect, sell, or transmit personal data. It stores only the selected model identifier and a Boolean Extended thinking preference through `chrome.storage.sync`.
+
+## Store images
+
+- Store icon: `assets/icons/icon-128.png`
+- Small promotional image: `assets/store/promo-small-440x280.png`
+- Screenshot 1: `assets/store/screenshot-1-settings-1280x800.png`
+- Screenshot 2: `assets/store/screenshot-2-applied-1280x800.png`
+
+Editable SVG sources for the icon and screenshots are included under `assets/icons` and `assets/store/source`.
