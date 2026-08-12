@@ -3,18 +3,17 @@
 
   const core = globalThis.GeminiDefaultModelCore;
   const APPLY_MESSAGE = "GEMINI_DEFAULT_MODEL_APPLY";
-  const RUN_PROMPT_MESSAGE = "GEMINI_FAST_PROMPT_RUN";
+  const OPEN_GEMINI_MESSAGE = "GEMINI_OPEN_NEW_TAB";
+  const OPEN_GEMINI_COMMAND = "open-gemini";
   const settingsPanel = document.querySelector("#settings-panel");
   const extendedInput = document.querySelector("#extended-thinking");
-  const promptInput = document.querySelector("#fast-prompt-input");
-  const promptSendButton = document.querySelector("#fast-prompt-send");
-  const shortcutLabel = document.querySelector("#fast-prompt-shortcut");
+  const openGeminiButton = document.querySelector("#open-gemini");
+  const shortcutLabel = document.querySelector("#open-gemini-shortcut");
   const shortcutChangeButton = document.querySelector(
-    "#fast-prompt-shortcut-change"
+    "#open-gemini-shortcut-change"
   );
   const status = document.querySelector("#status");
   let saveTimer = null;
-  let promptInFlight = false;
 
   function setStatus(message, kind = "info") {
     status.textContent = message;
@@ -63,11 +62,11 @@
   async function updateShortcutLabel() {
     try {
       const commands = await chrome.commands.getAll();
-      const actionCommand = commands.find(
-        (command) => command.name === "_execute_action"
+      const openCommand = commands.find(
+        (command) => command.name === OPEN_GEMINI_COMMAND
       );
-      shortcutLabel.textContent = actionCommand?.shortcut
-        ? `(${actionCommand.shortcut})`
+      shortcutLabel.textContent = openCommand?.shortcut
+        ? `(${openCommand.shortcut})`
         : "(hotkey not set)";
     } catch {
       shortcutLabel.textContent = "(hotkey unavailable)";
@@ -122,52 +121,6 @@
     return true;
   }
 
-  function setPromptBusy(isBusy) {
-    promptInFlight = isBusy;
-    promptInput.disabled = isBusy;
-    promptSendButton.disabled = isBusy;
-    promptSendButton.textContent = isBusy ? "Sending…" : "Send";
-  }
-
-  async function runFastPrompt() {
-    if (promptInFlight) {
-      return;
-    }
-
-    const prompt = promptInput.value.trim();
-    if (!prompt) {
-      setStatus("Enter a prompt first.", "error");
-      promptInput.focus();
-      return;
-    }
-
-    clearTimeout(saveTimer);
-    const settings = readForm();
-    setPromptBusy(true);
-    setStatus("Opening Gemini and sending…");
-
-    try {
-      await saveSettings(settings);
-      const result = await chrome.runtime.sendMessage({
-        type: RUN_PROMPT_MESSAGE,
-        prompt,
-        settings
-      });
-
-      if (!result?.ok) {
-        throw new Error(result?.error || "Could not send the prompt.");
-      }
-
-      promptInput.value = "";
-      setStatus("Sent to Gemini", "success");
-    } catch (error) {
-      setStatus(error.message || "Could not send the prompt.", "error");
-    } finally {
-      setPromptBusy(false);
-      promptInput.focus();
-    }
-  }
-
   settingsPanel.addEventListener("change", () => {
     clearTimeout(saveTimer);
     setStatus("Saving…");
@@ -178,8 +131,18 @@
     }, 120);
   });
 
-  promptSendButton.addEventListener("click", () => {
-    runFastPrompt();
+  openGeminiButton.addEventListener("click", async () => {
+    setStatus("Opening Gemini…");
+    try {
+      const result = await chrome.runtime.sendMessage({
+        type: OPEN_GEMINI_MESSAGE
+      });
+      if (!result?.ok) {
+        throw new Error(result?.error || "Could not open Gemini.");
+      }
+    } catch (error) {
+      setStatus(error.message || "Could not open Gemini.", "error");
+    }
   });
 
   shortcutChangeButton.addEventListener("click", async () => {
@@ -193,15 +156,6 @@
     }
   });
 
-  promptInput.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" || event.shiftKey || event.isComposing) {
-      return;
-    }
-
-    event.preventDefault();
-    runFastPrompt();
-  });
-
   chrome.storage.sync.get(core.DEFAULT_SETTINGS, (storedSettings) => {
     const settings = core.normalizeSettings(storedSettings);
     writeForm(settings);
@@ -209,8 +163,4 @@
   });
 
   updateShortcutLabel();
-
-  requestAnimationFrame(() => {
-    promptInput.focus();
-  });
 })();

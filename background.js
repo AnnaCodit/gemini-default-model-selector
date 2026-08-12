@@ -1,32 +1,26 @@
 (function initializeBackground() {
   "use strict";
 
-  const RUN_PROMPT_MESSAGE = "GEMINI_FAST_PROMPT_RUN";
-  const SUBMIT_PROMPT_MESSAGE = "GEMINI_FAST_PROMPT_SUBMIT";
+  const OPEN_GEMINI_COMMAND = "open-gemini";
+  const OPEN_GEMINI_MESSAGE = "GEMINI_OPEN_NEW_TAB";
+  const APPLY_MESSAGE = "GEMINI_DEFAULT_MODEL_APPLY";
   const GEMINI_URL = "https://gemini.google.com/app";
   const CONNECTION_TIMEOUT_MS = 30_000;
   const CONNECTION_RETRY_MS = 250;
+  const DEFAULT_SETTINGS = {
+    model: "flash-3.6",
+    extendedThinking: true
+  };
 
   function delay(durationMs) {
     return new Promise((resolve) => setTimeout(resolve, durationMs));
   }
 
-  async function createGeminiTab() {
-    return chrome.tabs.create({
-      url: GEMINI_URL,
-      active: true
-    });
-  }
-
-  async function sendPromptWhenReady(
-    tabId,
-    message,
-    timeoutMs = CONNECTION_TIMEOUT_MS
-  ) {
+  async function sendMessageWhenReady(tabId, message) {
     const startedAt = Date.now();
     let lastError = null;
 
-    while (Date.now() - startedAt < timeoutMs) {
+    while (Date.now() - startedAt < CONNECTION_TIMEOUT_MS) {
       try {
         await chrome.tabs.get(tabId);
         return await chrome.tabs.sendMessage(tabId, message);
@@ -41,45 +35,54 @@
     );
   }
 
-  async function runFastPrompt(message) {
-    const prompt = typeof message.prompt === "string"
-      ? message.prompt.trim()
-      : "";
-
-    if (!prompt) {
-      throw new Error("The prompt is empty.");
-    }
-
-    const tab = await createGeminiTab();
+  async function openGemini() {
+    const tab = await chrome.tabs.create({
+      url: GEMINI_URL,
+      active: true
+    });
     if (typeof tab.id !== "number") {
       throw new Error("Could not open a Gemini tab.");
     }
 
-    const submitMessage = {
-      type: SUBMIT_PROMPT_MESSAGE,
-      prompt,
-      settings: message.settings
-    };
-    const result = await sendPromptWhenReady(tab.id, submitMessage);
+    const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+    const result = await sendMessageWhenReady(tab.id, {
+      type: APPLY_MESSAGE,
+      settings,
+      focusComposer: true,
+      waitForUi: true
+    });
 
-    if (!result?.ok) {
-      throw new Error(result?.error || "Gemini did not accept the prompt.");
+    if (!result?.ok || !result.applied) {
+      throw new Error(
+        result?.error || result?.reason || "The Gemini interface is not ready."
+      );
     }
 
     return { ok: true, tabId: tab.id };
   }
 
+  chrome.commands.onCommand.addListener((command) => {
+    if (command !== OPEN_GEMINI_COMMAND) {
+      return undefined;
+    }
+
+    return openGemini().catch((error) => {
+      console.error("[Gemini Default Model Selector]", error.message);
+      return { ok: false, error: error.message };
+    });
+  });
+
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type !== RUN_PROMPT_MESSAGE) {
+    if (message?.type !== OPEN_GEMINI_MESSAGE) {
       return false;
     }
 
-    runFastPrompt(message)
+    openGemini()
       .then(sendResponse)
       .catch((error) => {
         sendResponse({
           ok: false,
-          error: error.message || "Could not send the prompt."
+          error: error.message || "Could not open Gemini."
         });
       });
     return true;

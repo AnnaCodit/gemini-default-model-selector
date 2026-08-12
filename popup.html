@@ -50,14 +50,14 @@
       </label>
     </section>
     <p id="status" class="status" role="status" aria-live="polite"> Loading settings… </p>
-    <fieldset class="fast-prompt">
-      <legend class="fast-prompt-heading">
-        <span>Fast prompt <span id="fast-prompt-shortcut">(…)</span></span>
-        <button id="fast-prompt-shortcut-change" type="button" aria-label="Change Fast prompt keyboard shortcut">Change</button>
-      </legend>
-      <textarea id="fast-prompt-input" rows="3" placeholder="Ask Gemini…" aria-label="Fast prompt" autofocus></textarea>
-      <button id="fast-prompt-send" type="button">Send</button>
-    </fieldset>
+    <section class="gemini-shortcut" aria-label="Open Gemini shortcut">
+      <button id="open-gemini" class="open-gemini" type="button">
+        <span>Open Gemini</span>
+        <span id="open-gemini-shortcut">(…)</span>
+      </button>
+      <button id="open-gemini-shortcut-change" class="shortcut-change" type="button"
+        aria-label="Change Open Gemini keyboard shortcut">Change</button>
+    </section>
   </main>
   <script src="shared.js"></script>
   <script src="popup.js"></script>

@@ -25,7 +25,7 @@ Gemini Default Model Selector automatically applies your saved preferences when 
 - No analytics, ads, or external data transmission.
 
 💥 BONUS
-- Fast prompt with Alt+G shortcut
+- Open a new Gemini tab and focus its prompt with Alt+G
 - Change shortcut in Chrome extensions settings
 
 

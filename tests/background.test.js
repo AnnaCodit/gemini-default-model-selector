@@ -11,12 +11,28 @@ const source = fs.readFileSync(
 
 function loadBackground() {
   const calls = [];
+  let commandListener = null;
   let messageListener = null;
   const chrome = {
+    commands: {
+      onCommand: {
+        addListener(listener) {
+          commandListener = listener;
+        }
+      }
+    },
     runtime: {
       onMessage: {
         addListener(listener) {
           messageListener = listener;
+        }
+      }
+    },
+    storage: {
+      sync: {
+        async get(defaults) {
+          calls.push(["storageGet", defaults]);
+          return { model: "pro-3.1", extendedThinking: false };
         }
       }
     },
@@ -31,16 +47,16 @@ function loadBackground() {
       },
       async sendMessage(tabId, message) {
         calls.push(["sendMessage", tabId, message]);
-        return { ok: true, submitted: true };
+        return { ok: true, applied: true };
       }
     }
   };
 
   vm.runInContext(
     source,
-    vm.createContext({ chrome, setTimeout, clearTimeout })
+    vm.createContext({ chrome, console, setTimeout, clearTimeout })
   );
-  return { calls, messageListener };
+  return { calls, commandListener, messageListener };
 }
 
 function sendRuntimeMessage(listener, message) {
@@ -53,12 +69,10 @@ function toPlain(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-test("opens a new active Gemini tab and submits the prompt", async () => {
+test("opens a new active Gemini tab and focuses its composer", async () => {
   const { calls, messageListener } = loadBackground();
   const response = await sendRuntimeMessage(messageListener, {
-    type: "GEMINI_FAST_PROMPT_RUN",
-    prompt: "Explain this code",
-    settings: { model: "pro-3.1", extendedThinking: true }
+    type: "GEMINI_OPEN_NEW_TAB"
   });
 
   assert.deepEqual(toPlain(response), { ok: true, tabId: 42 });
@@ -66,18 +80,30 @@ test("opens a new active Gemini tab and submits the prompt", async () => {
     "create",
     { url: "https://gemini.google.com/app", active: true }
   ]);
-  assert.deepEqual(toPlain(calls[2]), [
+  assert.deepEqual(toPlain(calls[3]), [
     "sendMessage",
     42,
     {
-      type: "GEMINI_FAST_PROMPT_SUBMIT",
-      prompt: "Explain this code",
-      settings: { model: "pro-3.1", extendedThinking: true }
+      type: "GEMINI_DEFAULT_MODEL_APPLY",
+      settings: { model: "pro-3.1", extendedThinking: false },
+      focusComposer: true,
+      waitForUi: true
     }
   ]);
 });
 
-test("ignores unrelated runtime messages", () => {
-  const { messageListener } = loadBackground();
+test("opens Gemini when the keyboard command runs", async () => {
+  const { calls, commandListener } = loadBackground();
+  await commandListener("open-gemini");
+
+  assert.equal(calls.filter(([name]) => name === "create").length, 1);
+  assert.equal(calls.filter(([name]) => name === "sendMessage").length, 1);
+});
+
+test("ignores unrelated commands and runtime messages", () => {
+  const { calls, commandListener, messageListener } = loadBackground();
+
+  assert.equal(commandListener("other-command"), undefined);
   assert.equal(messageListener({ type: "OTHER" }, {}, () => {}), false);
+  assert.equal(calls.length, 0);
 });
