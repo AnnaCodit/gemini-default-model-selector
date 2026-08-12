@@ -8,6 +8,10 @@
   const extendedInput = document.querySelector("#extended-thinking");
   const promptInput = document.querySelector("#fast-prompt-input");
   const promptSendButton = document.querySelector("#fast-prompt-send");
+  const shortcutLabel = document.querySelector("#fast-prompt-shortcut");
+  const shortcutChangeButton = document.querySelector(
+    "#fast-prompt-shortcut-change"
+  );
   const status = document.querySelector("#status");
   let saveTimer = null;
   let promptInFlight = false;
@@ -54,6 +58,20 @@
 
   async function saveSettings(settings) {
     await chrome.storage.sync.set(settings);
+  }
+
+  async function updateShortcutLabel() {
+    try {
+      const commands = await chrome.commands.getAll();
+      const actionCommand = commands.find(
+        (command) => command.name === "_execute_action"
+      );
+      shortcutLabel.textContent = actionCommand?.shortcut
+        ? `(${actionCommand.shortcut})`
+        : "(hotkey not set)";
+    } catch {
+      shortcutLabel.textContent = "(hotkey unavailable)";
+    }
   }
 
   async function applyToCurrentTab(settings, focusComposer) {
@@ -164,6 +182,17 @@
     runFastPrompt();
   });
 
+  shortcutChangeButton.addEventListener("click", async () => {
+    try {
+      await chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+    } catch {
+      setStatus(
+        "Open chrome://extensions/shortcuts to change the hotkey.",
+        "info"
+      );
+    }
+  });
+
   promptInput.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || event.shiftKey || event.isComposing) {
       return;
@@ -178,6 +207,8 @@
     writeForm(settings);
     setStatus("Changes save automatically");
   });
+
+  updateShortcutLabel();
 
   requestAnimationFrame(() => {
     promptInput.focus();

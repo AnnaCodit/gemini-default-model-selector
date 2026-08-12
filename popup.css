@@ -92,6 +92,35 @@ legend {
   margin-top: 18px;
 }
 
+.fast-prompt-heading {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fast-prompt-heading button {
+  padding: 2px 0;
+  border: 0;
+  color: #526ff3;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 680;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.fast-prompt-heading button:hover {
+  text-decoration: underline;
+}
+
+.fast-prompt-heading button:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid rgb(82 111 243 / 36%);
+  outline-offset: 2px;
+}
+
 .fast-prompt textarea {
   width: 100%;
   min-height: 76px;
@@ -115,7 +144,7 @@ legend {
   outline-offset: 2px;
 }
 
-.fast-prompt button {
+.fast-prompt > button {
   min-height: 38px;
   padding: 9px 14px;
   border: 0;
@@ -130,16 +159,16 @@ legend {
     opacity 140ms ease;
 }
 
-.fast-prompt button:hover {
+.fast-prompt > button:hover {
   background: #405bda;
 }
 
-.fast-prompt button:focus-visible {
+.fast-prompt > button:focus-visible {
   outline: 3px solid rgb(82 111 243 / 28%);
   outline-offset: 2px;
 }
 
-.fast-prompt button:disabled,
+.fast-prompt > button:disabled,
 .fast-prompt textarea:disabled {
   cursor: wait;
   opacity: 0.65;
@@ -310,6 +339,10 @@ legend {
 
   .fast-prompt textarea::placeholder {
     color: #9299a5;
+  }
+
+  .fast-prompt-heading button {
+    color: #9bb0ff;
   }
 
   .model-option:hover {
