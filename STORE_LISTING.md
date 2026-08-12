@@ -14,7 +14,7 @@ Choose the Gemini model you want to use by default and keep Extended thinking en
 
 Gemini Default Model Selector automatically applies your saved preferences when you open gemini.google.com. You can still switch models manually for the current tab—the extension will not override that choice until the page is reloaded.
 
-Features:
+✨ FEATURES
 
 - Choose 3.5 Flash-Lite, 3.6 Flash, or 3.1 Pro.
 - Save the Extended thinking setting.
@@ -22,8 +22,12 @@ Features:
 - Keep manual model changes for the current tab.
 - Return focus to the prompt after switching.
 - Sync preferences with Chrome Sync.
-- Run only on gemini.google.com.
 - No analytics, ads, or external data transmission.
+
+💥 BONUS
+- Fast prompt with Alt+G shortcut
+- Change shortcut in Chrome extensions settings
+
 
 This extension is not affiliated with Google. Gemini is a trademark of Google LLC.
 
