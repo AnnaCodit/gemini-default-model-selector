@@ -3,14 +3,18 @@
 
   const core = globalThis.GeminiDefaultModelCore;
   const APPLY_MESSAGE = "GEMINI_DEFAULT_MODEL_APPLY";
+  const SUBMIT_PROMPT_MESSAGE = "GEMINI_FAST_PROMPT_SUBMIT";
   const RETRY_DELAY_MS = 150;
   const UI_TIMEOUT_MS = 3500;
+  const FAST_PROMPT_UI_TIMEOUT_MS = 30_000;
+  const SEND_BUTTON_TIMEOUT_MS = 10_000;
   const INTERACTION_SETTLE_MS = 250;
   const STATE_STABLE_MS = 200;
   const MAX_INTERACTION_ATTEMPTS = 2;
 
   let currentSettings = core.DEFAULT_SETTINGS;
   let applyQueue = Promise.resolve();
+  let promptQueue = Promise.resolve();
   let scheduledTimer = null;
   let initialApplicationComplete = false;
   let initialApplicationInProgress = false;
@@ -134,6 +138,159 @@
 
     placeCaretAtEnd(editor);
     return true;
+  }
+
+  function setPromptText(editor, prompt) {
+    editor.focus({ preventScroll: true });
+
+    if (editor instanceof HTMLTextAreaElement) {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value"
+      )?.set;
+      if (valueSetter) {
+        valueSetter.call(editor, prompt);
+      } else {
+        editor.value = prompt;
+      }
+      editor.dispatchEvent(
+        new InputEvent("input", {
+          bubbles: true,
+          inputType: "insertText",
+          data: prompt
+        })
+      );
+      editor.setSelectionRange(prompt.length, prompt.length);
+      return;
+    }
+
+    const selection = document.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    const inserted = document.execCommand("insertText", false, prompt);
+    if (!inserted) {
+      editor.textContent = prompt;
+      editor.dispatchEvent(
+        new InputEvent("input", {
+          bubbles: true,
+          inputType: "insertText",
+          data: prompt
+        })
+      );
+    }
+
+    placeCaretAtEnd(editor);
+  }
+
+  function isEnabledButton(button) {
+    return (
+      isVisible(button) &&
+      !button.disabled &&
+      button.getAttribute("aria-disabled") !== "true"
+    );
+  }
+
+  function isSendButton(button) {
+    if (!isEnabledButton(button)) {
+      return false;
+    }
+
+    const label = core
+      .normalizeText(button.getAttribute("aria-label"))
+      .toLocaleLowerCase("en-US");
+    if (label.includes("feedback") || label.includes("отзыв")) {
+      return false;
+    }
+
+    if (
+      label.startsWith("send") ||
+      label.startsWith("submit") ||
+      label.startsWith("отправ") ||
+      button.classList.contains("send-button") ||
+      (button.getAttribute("data-test-id") || "")
+        .toLocaleLowerCase("en-US")
+        .includes("send")
+    ) {
+      return true;
+    }
+
+    const iconText = Array.from(
+      button.querySelectorAll("mat-icon, .google-symbols, .material-icons")
+    )
+      .map((icon) => core.normalizeText(icon.textContent))
+      .join(" ")
+      .toLocaleLowerCase("en-US");
+    return iconText === "send" || iconText === "arrow_upward";
+  }
+
+  function findSendButton(editor) {
+    let searchRoot = editor.parentElement;
+
+    while (searchRoot) {
+      const button = Array.from(searchRoot.querySelectorAll("button")).find(
+        isSendButton
+      );
+      if (button) {
+        return button;
+      }
+
+      if (searchRoot === document.body) {
+        break;
+      }
+      searchRoot = searchRoot.parentElement;
+    }
+
+    return null;
+  }
+
+  async function submitFastPrompt(message) {
+    const prompt = typeof message.prompt === "string"
+      ? message.prompt.trim()
+      : "";
+    if (!prompt) {
+      throw new Error("The prompt is empty.");
+    }
+
+    currentSettings = core.normalizeSettings(message.settings);
+    const applyResult = await enqueueApply({
+      focusComposer: false,
+      timeoutMs: FAST_PROMPT_UI_TIMEOUT_MS
+    });
+    if (!applyResult?.applied) {
+      throw new Error(
+        applyResult?.reason || "The Gemini interface is not ready yet."
+      );
+    }
+
+    const editor = await waitFor(
+      findPromptEditor,
+      FAST_PROMPT_UI_TIMEOUT_MS
+    );
+    if (!editor) {
+      throw new Error("Could not find the Gemini prompt field.");
+    }
+
+    setPromptText(editor, prompt);
+    const sendButton = await waitFor(
+      () => findSendButton(editor),
+      SEND_BUTTON_TIMEOUT_MS
+    );
+    if (!sendButton) {
+      throw new Error("Could not find an enabled Gemini send button.");
+    }
+
+    sendButton.click();
+    return { submitted: true };
+  }
+
+  function enqueuePrompt(message) {
+    promptQueue = promptQueue
+      .catch(() => undefined)
+      .then(() => submitFastPrompt(message));
+    return promptQueue;
   }
 
   function getVisibleMenuItems() {
@@ -314,7 +471,10 @@
 
   async function applySettings(options = {}) {
     const targetSettings = currentSettings;
-    const picker = await waitFor(findModePicker, UI_TIMEOUT_MS);
+    const picker = await waitFor(
+      findModePicker,
+      options.timeoutMs || UI_TIMEOUT_MS
+    );
     if (!picker) {
       return { applied: false, reason: "The Gemini interface is not ready yet." };
     }
@@ -474,18 +634,28 @@
   });
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type !== APPLY_MESSAGE) {
-      return false;
+    if (message?.type === APPLY_MESSAGE) {
+      currentSettings = core.normalizeSettings(message.settings);
+      enqueueApply({ focusComposer: message.focusComposer !== false })
+        .then((result) => {
+          completeInitialApplication(result);
+          sendResponse({ ok: true, ...result });
+        })
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
     }
 
-    currentSettings = core.normalizeSettings(message.settings);
-    enqueueApply({ focusComposer: message.focusComposer !== false })
-      .then((result) => {
-        completeInitialApplication(result);
-        sendResponse({ ok: true, ...result });
-      })
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
-    return true;
+    if (message?.type === SUBMIT_PROMPT_MESSAGE) {
+      enqueuePrompt(message)
+        .then((result) => {
+          completeInitialApplication({ applied: true });
+          sendResponse({ ok: true, ...result });
+        })
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
+    return false;
   });
 
   chrome.storage.sync.get(core.DEFAULT_SETTINGS, (storedSettings) => {
