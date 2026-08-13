@@ -5,6 +5,7 @@
   const APPLY_MESSAGE = "GEMINI_DEFAULT_MODEL_APPLY";
   const RETRY_DELAY_MS = 150;
   const UI_TIMEOUT_MS = 3500;
+  const COLD_START_UI_TIMEOUT_MS = 30_000;
   const INTERACTION_SETTLE_MS = 250;
   const STATE_STABLE_MS = 200;
   const MAX_INTERACTION_ATTEMPTS = 2;
@@ -102,8 +103,8 @@
     selection.addRange(range);
   }
 
-  async function restoreEditorFocus(snapshot) {
-    const editor = await waitFor(findPromptEditor, UI_TIMEOUT_MS);
+  async function restoreEditorFocus(snapshot, timeoutMs = UI_TIMEOUT_MS) {
+    const editor = await waitFor(findPromptEditor, timeoutMs);
     if (!editor) {
       return false;
     }
@@ -314,7 +315,10 @@
 
   async function applySettings(options = {}) {
     const targetSettings = currentSettings;
-    const picker = await waitFor(findModePicker, UI_TIMEOUT_MS);
+    const picker = await waitFor(
+      findModePicker,
+      options.timeoutMs || UI_TIMEOUT_MS
+    );
     if (!picker) {
       return { applied: false, reason: "The Gemini interface is not ready yet." };
     }
@@ -380,12 +384,18 @@
       }
 
       if (changed || options.focusComposer) {
-        await restoreEditorFocus(selectionSnapshot);
+        await restoreEditorFocus(
+          selectionSnapshot,
+          options.timeoutMs || UI_TIMEOUT_MS
+        );
       }
 
       return { applied: true, changed };
     } catch (error) {
-      await restoreEditorFocus(selectionSnapshot);
+      await restoreEditorFocus(
+        selectionSnapshot,
+        options.timeoutMs || UI_TIMEOUT_MS
+      );
       throw error;
     }
   }
@@ -469,23 +479,26 @@
 
     currentSettings = core.normalizeSettings(nextSettings);
     // Синхронизация меняет значение по умолчанию, но не должна повторно
-    // переключать уже открытую вкладку. Активная вкладка получает одну
-    // явную команду из popup, а остальные сохраняют ручной выбор пользователя.
+    // переключать уже открытую вкладку. Нужная вкладка получает одну явную
+    // команду, а остальные сохраняют ручной выбор пользователя.
   });
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type !== APPLY_MESSAGE) {
-      return false;
+    if (message?.type === APPLY_MESSAGE) {
+      currentSettings = core.normalizeSettings(message.settings);
+      enqueueApply({
+        focusComposer: message.focusComposer !== false,
+        timeoutMs: message.waitForUi ? COLD_START_UI_TIMEOUT_MS : undefined
+      })
+        .then((result) => {
+          completeInitialApplication(result);
+          sendResponse({ ok: true, ...result });
+        })
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
     }
 
-    currentSettings = core.normalizeSettings(message.settings);
-    enqueueApply({ focusComposer: message.focusComposer !== false })
-      .then((result) => {
-        completeInitialApplication(result);
-        sendResponse({ ok: true, ...result });
-      })
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
-    return true;
+    return false;
   });
 
   chrome.storage.sync.get(core.DEFAULT_SETTINGS, (storedSettings) => {

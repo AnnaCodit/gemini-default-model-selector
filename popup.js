@@ -3,14 +3,36 @@
 
   const core = globalThis.GeminiDefaultModelCore;
   const APPLY_MESSAGE = "GEMINI_DEFAULT_MODEL_APPLY";
+  const OPEN_GEMINI_MESSAGE = "GEMINI_OPEN_NEW_TAB";
+  const OPEN_GEMINI_COMMAND = "open-gemini";
   const settingsPanel = document.querySelector("#settings-panel");
   const extendedInput = document.querySelector("#extended-thinking");
+  const openGeminiButton = document.querySelector("#open-gemini");
+  const shortcutLabel = document.querySelector("#open-gemini-shortcut");
+  const shortcutChangeButton = document.querySelector(
+    "#open-gemini-shortcut-change"
+  );
   const status = document.querySelector("#status");
   let saveTimer = null;
 
   function setStatus(message, kind = "info") {
     status.textContent = message;
     status.dataset.kind = kind;
+  }
+
+  function setGeminiLinkStatus() {
+    const link = document.createElement("a");
+    link.href = "https://gemini.google.com/";
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "Gemini";
+
+    status.replaceChildren(
+      document.createTextNode("Saved. Open or refresh "),
+      link,
+      document.createTextNode(" to apply it.")
+    );
+    status.dataset.kind = "success";
   }
 
   function readForm() {
@@ -37,6 +59,20 @@
     await chrome.storage.sync.set(settings);
   }
 
+  async function updateShortcutLabel() {
+    try {
+      const commands = await chrome.commands.getAll();
+      const openCommand = commands.find(
+        (command) => command.name === OPEN_GEMINI_COMMAND
+      );
+      shortcutLabel.textContent = openCommand?.shortcut
+        ? `(${openCommand.shortcut})`
+        : "(hotkey not set)";
+    } catch {
+      shortcutLabel.textContent = "(hotkey unavailable)";
+    }
+  }
+
   async function applyToCurrentTab(settings, focusComposer) {
     const [activeTab] = await chrome.tabs.query({
       active: true,
@@ -56,7 +92,8 @@
     } catch {
       return {
         ok: false,
-        error: "Saved. Open or refresh gemini.google.com to apply it."
+        error: "Saved. Open or refresh Gemini to apply it.",
+        showGeminiLink: true
       };
     }
   }
@@ -67,6 +104,10 @@
     const result = await applyToCurrentTab(settings, true);
 
     if (!result?.ok) {
+      if (result?.showGeminiLink) {
+        setGeminiLinkStatus();
+        return false;
+      }
       setStatus(result?.error || "Saved, but not applied yet.", "error");
       return false;
     }
@@ -90,9 +131,36 @@
     }, 120);
   });
 
+  openGeminiButton.addEventListener("click", async () => {
+    setStatus("Opening Gemini…");
+    try {
+      const result = await chrome.runtime.sendMessage({
+        type: OPEN_GEMINI_MESSAGE
+      });
+      if (!result?.ok) {
+        throw new Error(result?.error || "Could not open Gemini.");
+      }
+    } catch (error) {
+      setStatus(error.message || "Could not open Gemini.", "error");
+    }
+  });
+
+  shortcutChangeButton.addEventListener("click", async () => {
+    try {
+      await chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+    } catch {
+      setStatus(
+        "Open chrome://extensions/shortcuts to change the hotkey.",
+        "info"
+      );
+    }
+  });
+
   chrome.storage.sync.get(core.DEFAULT_SETTINGS, (storedSettings) => {
     const settings = core.normalizeSettings(storedSettings);
     writeForm(settings);
     setStatus("Changes save automatically");
   });
+
+  updateShortcutLabel();
 })();

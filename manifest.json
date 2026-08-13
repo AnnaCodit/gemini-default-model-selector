@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gemini Default Model Selector",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "description": "Automatically applies your preferred Gemini model and Extended thinking setting when Gemini opens.",
   "icons": {
     "16": "assets/icons/icon-16.png",
@@ -22,6 +22,18 @@
       "32": "assets/icons/icon-32.png"
     },
     "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "open-gemini": {
+      "suggested_key": {
+        "default": "Alt+G",
+        "mac": "Option+G"
+      },
+      "description": "Open Gemini in a new tab"
+    }
   },
   "content_scripts": [
     {

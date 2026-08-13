@@ -17,7 +17,8 @@ body {
   background: #f8fafd;
 }
 
-input {
+input,
+button {
   font: inherit;
 }
 
@@ -84,6 +85,58 @@ legend {
   background: #fff;
 }
 
+.gemini-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.open-gemini {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #dfe3eb;
+  border-radius: 12px;
+  color: #202124;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 680;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.open-gemini:hover {
+  border-color: #9bbcff;
+  background: #f9fbff;
+}
+
+.open-gemini:focus-visible,
+.shortcut-change:focus-visible {
+  outline: 3px solid rgb(82 111 243 / 28%);
+  outline-offset: 2px;
+}
+
+.shortcut-change {
+  flex: 0 0 auto;
+  padding: 4px 0;
+  border: 0;
+  color: #526ff3;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.shortcut-change:hover {
+  text-decoration: underline;
+}
+
 .model-option {
   position: relative;
   gap: 12px;
@@ -129,11 +182,11 @@ legend {
   border-radius: 50%;
 }
 
-.model-option input:checked + .radio-indicator {
+.model-option input:checked+.radio-indicator {
   border-color: #526ff3;
 }
 
-.model-option input:checked + .radio-indicator::after {
+.model-option input:checked+.radio-indicator::after {
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -148,7 +201,7 @@ legend {
 }
 
 .model-copy,
-.thinking-option > strong {
+.thinking-option>strong {
   display: block;
 }
 
@@ -194,11 +247,11 @@ legend {
   transition: transform 150ms ease;
 }
 
-.switch input:checked + .switch-track {
+.switch input:checked+.switch-track {
   background: #526ff3;
 }
 
-.switch input:checked + .switch-track::after {
+.switch input:checked+.switch-track::after {
   transform: translateX(18px);
 }
 
@@ -219,6 +272,11 @@ legend {
   color: #137333;
 }
 
+.status a {
+  color: inherit;
+  /* font-weight: 650; */
+}
+
 @media (prefers-color-scheme: dark) {
   body {
     color: #e8eaed;
@@ -232,9 +290,23 @@ legend {
   }
 
   .model-option,
-  .thinking-option {
+  .thinking-option,
+  .open-gemini {
     border-color: #3b4049;
     background: #22252a;
+  }
+
+  .open-gemini {
+    color: #e8eaed;
+  }
+
+  .shortcut-change {
+    color: #9bb0ff;
+  }
+
+  .open-gemini:hover {
+    border-color: #738cd8;
+    background: #282c35;
   }
 
   .model-option:hover {
@@ -257,6 +329,7 @@ legend {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
