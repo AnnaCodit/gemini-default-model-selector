@@ -16,7 +16,7 @@ Gemini Default Model Selector automatically applies your saved preferences when 
 
 ✨ FEATURES
 
-- Choose 3.5 Flash-Lite, 3.6 Flash, or 3.1 Pro.
+- Choose 3.5 Flash-Lite, 3.7 Flash, or 3.1 Pro.
 - Save the Extended thinking setting.
 - Apply saved preferences automatically when Gemini opens.
 - Keep manual model changes for the current tab.

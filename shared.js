@@ -9,10 +9,10 @@
       menuPrefix: "3.5 Flash-Lite"
     }),
     Object.freeze({
-      id: "flash-3.6",
-      label: "3.6 Flash",
+      id: "flash-3.7",
+      label: "3.7 Flash",
       description: "All-around help",
-      menuPrefix: "3.6 Flash"
+      menuPrefix: "3.7 Flash"
     }),
     Object.freeze({
       id: "pro-3.1",
@@ -23,7 +23,7 @@
   ]);
 
   const DEFAULT_SETTINGS = Object.freeze({
-    model: "flash-3.6",
+    model: "flash-3.7",
     extendedThinking: true
   });
 
@@ -31,11 +31,11 @@
 
   function normalizeSettings(value) {
     const candidate = value && typeof value === "object" ? value : {};
+    const model =
+      candidate.model === "flash-3.6" ? "flash-3.7" : candidate.model;
 
     return {
-      model: MODEL_IDS.has(candidate.model)
-        ? candidate.model
-        : DEFAULT_SETTINGS.model,
+      model: MODEL_IDS.has(model) ? model : DEFAULT_SETTINGS.model,
       extendedThinking:
         typeof candidate.extendedThinking === "boolean"
           ? candidate.extendedThinking
@@ -57,8 +57,8 @@
       model = "flash-lite-3.5";
     } else if (text.includes("pro") || text.includes("3.1")) {
       model = "pro-3.1";
-    } else if (text.includes("flash") || text.includes("3.6")) {
-      model = "flash-3.6";
+    } else if (text.includes("flash") || text.includes("3.7")) {
+      model = "flash-3.7";
     }
 
     return {

@@ -32,8 +32,9 @@ test("infers every Gemini model from picker text", () => {
     "flash-lite-3.5"
   );
   assert.equal(
-    core.inferPickerState("Open mode picker, currently Flash Extended").model,
-    "flash-3.6"
+    core.inferPickerState("Open mode picker, currently 3.7 Flash Extended")
+      .model,
+    "flash-3.7"
   );
   assert.equal(
     core.inferPickerState("Open mode picker, currently Pro").model,
@@ -59,10 +60,22 @@ test("infers Extended thinking state", () => {
   );
 });
 
+test("migrates the former Flash model setting", () => {
+  assert.deepEqual(
+    {
+      ...core.normalizeSettings({
+        model: "flash-3.6",
+        extendedThinking: false
+      })
+    },
+    { model: "flash-3.7", extendedThinking: false }
+  );
+});
+
 test("finds the thinking option independently of its language", () => {
   const russianOptions = [
     { text: "3.5 Flash-Lite Самые быстрые ответы" },
-    { text: "3.6 Flash All-around help" },
+    { text: "3.7 Flash All-around help" },
     { text: "3.1 Pro Advanced math & code" },
     {
       text: "Расширенные способности к размышлениям Решение сложных проблем",
@@ -74,7 +87,7 @@ test("finds the thinking option independently of its language", () => {
   assert.equal(
     core.findExtendedOptionIndex([
       { text: "3.5 Flash-Lite Fastest answers" },
-      { text: "3.6 Flash All-around help" },
+      { text: "3.7 Flash All-around help" },
       { text: "3.1 Pro Advanced math & code" },
       { text: "Extended thinking Complex problem solving" }
     ]),
