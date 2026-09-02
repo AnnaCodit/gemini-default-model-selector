@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gemini Default Model Selector",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Automatically applies your preferred Gemini model and Extended thinking setting when Gemini opens.",
   "icons": {
     "16": "assets/icons/icon-16.png",

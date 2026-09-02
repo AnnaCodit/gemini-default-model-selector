@@ -16,7 +16,8 @@ Gemini Default Model Selector automatically applies your saved preferences when 
 
 ✨ FEATURES
 
-- Choose 3.5 Flash-Lite, 3.7 Flash, or 3.1 Pro.
+- Choose 3.5 Flash-Lite, 3.8 Flash, or 3.1 Pro.
+- Graceful fallback to 3.7 Flash while Google progressively rolls out 3.8 Flash.
 - Save the Extended thinking setting.
 - Apply saved preferences automatically when Gemini opens.
 - Keep manual model changes for the current tab.

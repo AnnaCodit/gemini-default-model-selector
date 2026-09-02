@@ -107,3 +107,17 @@ test("ignores unrelated commands and runtime messages", () => {
   assert.equal(messageListener({ type: "OTHER" }, {}, () => {}), false);
   assert.equal(calls.length, 0);
 });
+
+test("queries storage with default settings for flash-3.8", async () => {
+  const { calls, messageListener } = loadBackground();
+  await sendRuntimeMessage(messageListener, {
+    type: "GEMINI_OPEN_NEW_TAB"
+  });
+
+  const storageCall = calls.find(([name]) => name === "storageGet");
+  assert.deepEqual(toPlain(storageCall[1]), {
+    model: "flash-3.8",
+    extendedThinking: true
+  });
+});
+

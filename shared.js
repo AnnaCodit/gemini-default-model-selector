@@ -9,6 +9,13 @@
       menuPrefix: "3.5 Flash-Lite"
     }),
     Object.freeze({
+      id: "flash-3.8",
+      label: "3.8 Flash",
+      description: "All-around help",
+      menuPrefix: "3.8 Flash",
+      fallbackId: "flash-3.7"
+    }),
+    Object.freeze({
       id: "flash-3.7",
       label: "3.7 Flash",
       description: "All-around help",
@@ -23,7 +30,7 @@
   ]);
 
   const DEFAULT_SETTINGS = Object.freeze({
-    model: "flash-3.7",
+    model: "flash-3.8",
     extendedThinking: true
   });
 
@@ -31,8 +38,10 @@
 
   function normalizeSettings(value) {
     const candidate = value && typeof value === "object" ? value : {};
-    const model =
-      candidate.model === "flash-3.6" ? "flash-3.7" : candidate.model;
+    let model = candidate.model;
+    if (model === "flash-3.6" || model === "flash-3.7") {
+      model = "flash-3.8";
+    }
 
     return {
       model: MODEL_IDS.has(model) ? model : DEFAULT_SETTINGS.model,
@@ -57,8 +66,10 @@
       model = "flash-lite-3.5";
     } else if (text.includes("pro") || text.includes("3.1")) {
       model = "pro-3.1";
-    } else if (text.includes("flash") || text.includes("3.7")) {
+    } else if (text.includes("3.7")) {
       model = "flash-3.7";
+    } else if (text.includes("flash") || text.includes("3.8")) {
+      model = "flash-3.8";
     }
 
     return {
@@ -76,6 +87,23 @@
 
   function getModel(modelId) {
     return MODEL_OPTIONS.find((model) => model.id === modelId) || null;
+  }
+
+  function resolveModelWithFallback(modelId, isAvailable) {
+    const target = getModel(modelId);
+    if (!target) {
+      return null;
+    }
+    if (typeof isAvailable !== "function" || isAvailable(target)) {
+      return target;
+    }
+    if (target.fallbackId) {
+      const fallback = getModel(target.fallbackId);
+      if (fallback && isAvailable(fallback)) {
+        return fallback;
+      }
+    }
+    return target;
   }
 
   function findExtendedOptionIndex(options) {
@@ -114,6 +142,7 @@
     inferPickerState,
     normalizeSettings,
     normalizeText,
+    resolveModelWithFallback,
     resolvePickerState
   });
 })(globalThis);

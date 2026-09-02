@@ -238,8 +238,11 @@
 
     for (let attempt = 0; attempt < MAX_INTERACTION_ATTEMPTS; attempt += 1) {
       const pickerBefore = findModePicker();
-      if (pickerBefore && readPickerState(pickerBefore).model === modelId) {
-        return;
+      const currentModel = pickerBefore
+        ? readPickerState(pickerBefore).model
+        : null;
+      if (currentModel === modelId) {
+        return { modelId, changed: false };
       }
 
       const items = await openModeMenu();
@@ -248,21 +251,42 @@
         continue;
       }
 
-      const menuItem = findMenuItem(items, model.menuPrefix);
+      let menuItem = findMenuItem(items, model.menuPrefix);
+      let effectiveModel = model;
+
+      if (!menuItem && model.fallbackId) {
+        const fallback = core.getModel(model.fallbackId);
+        if (fallback) {
+          const fallbackItem = findMenuItem(items, fallback.menuPrefix);
+          if (fallbackItem) {
+            menuItem = fallbackItem;
+            effectiveModel = fallback;
+          }
+        }
+      }
 
       if (!menuItem) {
         throw new Error(`Could not find the ${model.label} model option.`);
       }
 
+      if (currentModel === effectiveModel.id) {
+        const picker = findModePicker();
+        if (picker?.getAttribute("aria-expanded") === "true") {
+          picker.click();
+          await delay(INTERACTION_SETTLE_MS);
+        }
+        return { modelId: effectiveModel.id, changed: false };
+      }
+
       menuItem.click();
 
       const applied = await waitForStablePickerState(
-        (state) => state.model === modelId
+        (state) => state.model === effectiveModel.id
       );
 
       if (applied) {
         await delay(INTERACTION_SETTLE_MS);
-        return;
+        return { modelId: effectiveModel.id, changed: true };
       }
 
       await delay(INTERACTION_SETTLE_MS);
@@ -325,12 +349,18 @@
 
     const selectionSnapshot = captureEditorSelection();
     let changed = false;
+    let effectiveModelId = targetSettings.model;
 
     try {
       const initialState = readPickerState(picker);
       if (initialState.model !== targetSettings.model) {
-        await selectModel(targetSettings.model);
-        changed = true;
+        const selectionResult = await selectModel(targetSettings.model);
+        if (selectionResult?.modelId) {
+          effectiveModelId = selectionResult.modelId;
+        }
+        if (selectionResult?.changed) {
+          changed = true;
+        }
       }
 
       const extendedChanged = await setExtendedThinking(
@@ -342,7 +372,7 @@
 
       let finalState = await waitForStablePickerState(
         (state) =>
-          state.model === targetSettings.model &&
+          state.model === effectiveModelId &&
           state.extendedThinking === targetSettings.extendedThinking
       );
 
@@ -350,9 +380,14 @@
         const pickerAfter = findModePicker();
         const stateAfter = pickerAfter ? readPickerState(pickerAfter) : null;
 
-        if (!stateAfter || stateAfter.model !== targetSettings.model) {
-          await selectModel(targetSettings.model);
-          changed = true;
+        if (!stateAfter || stateAfter.model !== effectiveModelId) {
+          const retryResult = await selectModel(targetSettings.model);
+          if (retryResult?.modelId) {
+            effectiveModelId = retryResult.modelId;
+          }
+          if (retryResult?.changed) {
+            changed = true;
+          }
         }
 
         const pickerAfterModelRetry = findModePicker();
@@ -374,7 +409,7 @@
 
         finalState = await waitForStablePickerState(
           (state) =>
-            state.model === targetSettings.model &&
+            state.model === effectiveModelId &&
             state.extendedThinking === targetSettings.extendedThinking
         );
       }

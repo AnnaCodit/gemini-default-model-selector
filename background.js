@@ -8,7 +8,7 @@
   const CONNECTION_TIMEOUT_MS = 30_000;
   const CONNECTION_RETRY_MS = 250;
   const DEFAULT_SETTINGS = {
-    model: "flash-3.7",
+    model: "flash-3.8",
     extendedThinking: true
   };
 

@@ -32,6 +32,11 @@ test("infers every Gemini model from picker text", () => {
     "flash-lite-3.5"
   );
   assert.equal(
+    core.inferPickerState("Open mode picker, currently 3.8 Flash Extended")
+      .model,
+    "flash-3.8"
+  );
+  assert.equal(
     core.inferPickerState("Open mode picker, currently 3.7 Flash Extended")
       .model,
     "flash-3.7"
@@ -39,6 +44,10 @@ test("infers every Gemini model from picker text", () => {
   assert.equal(
     core.inferPickerState("Open mode picker, currently Pro").model,
     "pro-3.1"
+  );
+  assert.equal(
+    core.inferPickerState("Open mode picker, currently Flash Extended").model,
+    "flash-3.8"
   );
   assert.equal(
     core.inferPickerState(
@@ -60,7 +69,7 @@ test("infers Extended thinking state", () => {
   );
 });
 
-test("migrates the former Flash model setting", () => {
+test("migrates the former Flash model settings", () => {
   assert.deepEqual(
     {
       ...core.normalizeSettings({
@@ -68,8 +77,36 @@ test("migrates the former Flash model setting", () => {
         extendedThinking: false
       })
     },
-    { model: "flash-3.7", extendedThinking: false }
+    { model: "flash-3.8", extendedThinking: false }
   );
+  assert.deepEqual(
+    {
+      ...core.normalizeSettings({
+        model: "flash-3.7",
+        extendedThinking: false
+      })
+    },
+    { model: "flash-3.8", extendedThinking: false }
+  );
+});
+
+test("resolves model with fallback when the newer model is not yet rolled out", () => {
+  const availableWithout38 = new Set(["3.5 Flash-Lite", "3.7 Flash", "3.1 Pro"]);
+  const availableWith38 = new Set([
+    "3.5 Flash-Lite",
+    "3.8 Flash",
+    "3.1 Pro"
+  ]);
+
+  const resolvedFallback = core.resolveModelWithFallback("flash-3.8", (model) =>
+    availableWithout38.has(model.menuPrefix)
+  );
+  assert.equal(resolvedFallback?.id, "flash-3.7");
+
+  const resolvedDirect = core.resolveModelWithFallback("flash-3.8", (model) =>
+    availableWith38.has(model.menuPrefix)
+  );
+  assert.equal(resolvedDirect?.id, "flash-3.8");
 });
 
 test("finds the thinking option independently of its language", () => {
