@@ -12,16 +12,31 @@ const context = vm.createContext({});
 vm.runInContext(source, context);
 const core = context.GeminiDefaultModelCore;
 
-test("normalizes valid settings", () => {
+test("normalizes valid settings with thinkingLevel", () => {
   assert.deepEqual(
-    { ...core.normalizeSettings({ model: "pro-3.1", extendedThinking: false }) },
-    { model: "pro-3.1", extendedThinking: false }
+    { ...core.normalizeSettings({ model: "pro-3.1", thinkingLevel: "medium" }) },
+    { model: "pro-3.1", thinkingLevel: "medium", extendedThinking: true }
+  );
+  assert.deepEqual(
+    { ...core.normalizeSettings({ model: "pro-3.1", thinkingLevel: "low" }) },
+    { model: "pro-3.1", thinkingLevel: "low", extendedThinking: false }
+  );
+});
+
+test("migrates legacy extendedThinking boolean to thinkingLevel", () => {
+  assert.deepEqual(
+    { ...core.normalizeSettings({ model: "flash-3.8", extendedThinking: false }) },
+    { model: "flash-3.8", thinkingLevel: "low", extendedThinking: false }
+  );
+  assert.deepEqual(
+    { ...core.normalizeSettings({ model: "flash-3.8", extendedThinking: true }) },
+    { model: "flash-3.8", thinkingLevel: "high", extendedThinking: true }
   );
 });
 
 test("falls back to defaults for invalid settings", () => {
   assert.deepEqual(
-    { ...core.normalizeSettings({ model: "unknown", extendedThinking: "yes" }) },
+    { ...core.normalizeSettings({ model: "unknown", thinkingLevel: "invalid" }) },
     { ...core.DEFAULT_SETTINGS }
   );
 });
@@ -57,16 +72,15 @@ test("infers every Gemini model from picker text", () => {
   );
 });
 
-test("infers Extended thinking state", () => {
-  assert.equal(
-    core.inferPickerState("Open mode picker, currently Flash Extended")
-      .extendedThinking,
-    true
-  );
-  assert.equal(
-    core.inferPickerState("Open mode picker, currently Flash").extendedThinking,
-    false
-  );
+test("does not infer thinking levels from localized picker labels", () => {
+  for (const label of ["High", "Medium", "Low", "Средний", "高"]) {
+    assert.deepEqual({ ...core.inferPickerState(`Flash ${label}`) }, { model: "flash-3.8" });
+  }
+});
+
+test("a valid thinkingLevel overrides a stale legacy boolean", () => {
+  assert.equal(core.normalizeSettings({ thinkingLevel: "low", extendedThinking: true }).extendedThinking, false);
+  assert.equal(core.normalizeSettings({ thinkingLevel: "medium", extendedThinking: false }).extendedThinking, true);
 });
 
 test("migrates the former Flash model settings", () => {
@@ -77,16 +91,16 @@ test("migrates the former Flash model settings", () => {
         extendedThinking: false
       })
     },
-    { model: "flash-3.8", extendedThinking: false }
+    { model: "flash-3.8", thinkingLevel: "low", extendedThinking: false }
   );
   assert.deepEqual(
     {
       ...core.normalizeSettings({
         model: "flash-3.7",
-        extendedThinking: false
+        thinkingLevel: "high"
       })
     },
-    { model: "flash-3.8", extendedThinking: false }
+    { model: "flash-3.8", thinkingLevel: "high", extendedThinking: true }
   );
 });
 
@@ -109,8 +123,23 @@ test("resolves model with fallback when the newer model is not yet rolled out", 
   assert.equal(resolvedDirect?.id, "flash-3.8");
 });
 
-test("finds the thinking option independently of its language", () => {
+test("finds thinking options independently of language in new 3-option UI", () => {
   const russianOptions = [
+    { text: "3.5 Flash-Lite Самые быстрые ответы" },
+    { text: "3.8 Flash All-around help" },
+    { text: "3.1 Pro Advanced reasoning" },
+    { text: "Низкая Быстро и эффективно", followsSeparator: true },
+    { text: "Средний Сбалансированная глубина" },
+    { text: "Высокая Максимально тщательно" }
+  ];
+
+  assert.equal(core.findThinkingOptionIndex(russianOptions, "low"), 3);
+  assert.equal(core.findThinkingOptionIndex(russianOptions, "medium"), 4);
+  assert.equal(core.findThinkingOptionIndex(russianOptions, "high"), 5);
+});
+
+test("finds legacy single thinking option when only one option exists", () => {
+  const legacyRussian = [
     { text: "3.5 Flash-Lite Самые быстрые ответы" },
     { text: "3.7 Flash All-around help" },
     { text: "3.1 Pro Advanced math & code" },
@@ -120,28 +149,32 @@ test("finds the thinking option independently of its language", () => {
     }
   ];
 
-  assert.equal(core.findExtendedOptionIndex(russianOptions), 3);
-  assert.equal(
-    core.findExtendedOptionIndex([
-      { text: "3.5 Flash-Lite Fastest answers" },
-      { text: "3.7 Flash All-around help" },
-      { text: "3.1 Pro Advanced math & code" },
-      { text: "Extended thinking Complex problem solving" }
-    ]),
-    3
-  );
+  assert.equal(core.findThinkingOptionIndex(legacyRussian, "high"), 3);
+  assert.equal(core.findThinkingOptionIndex(legacyRussian, "low"), 3);
+  assert.equal(core.findExtendedOptionIndex(legacyRussian), 3);
 });
 
-test("reads thinking state from the picker structure, not localized text", () => {
-  const russianLabel =
-    "Выбор режима, сейчас используется Flash-Lite Расширенный";
+test("detects the new UI without a separator", () => {
+  const options = [
+    { text: "3.8 Flash" }, { text: "α" }, { text: "β" }, { text: "γ" }
+  ];
+  assert.deepEqual(JSON.parse(JSON.stringify(core.findThinkingOptions(options))), {
+    kind: "levels", indexes: [1, 2, 3]
+  });
+  assert.equal(core.findThinkingOptionIndex(options, "low"), 1);
+});
 
-  assert.equal(
-    core.resolvePickerState(russianLabel, true).extendedThinking,
-    true
-  );
-  assert.equal(
-    core.resolvePickerState(russianLabel, false).extendedThinking,
-    false
-  );
+test("prefers three radio options when a legacy checkbox is also present", () => {
+  const options = [
+    { text: "3.8 Flash", isModel: true }, { text: "Old toggle" },
+    { text: "α", isRadio: true }, { text: "β", isRadio: true }, { text: "γ", isRadio: true }
+  ];
+  assert.equal(core.findThinkingOptionIndex(options, "medium"), 3);
+});
+
+test("rejects incomplete or ambiguous thinking groups", () => {
+  assert.equal(core.findThinkingOptions([{ text: "α", isRadio: true }]), null);
+  assert.equal(core.findThinkingOptions([{ text: "α" }, { text: "β" }]), null);
+  assert.equal(core.findThinkingOptions(Array.from({ length: 4 }, (_, i) => ({ text: String(i) }))), null);
+  assert.equal(core.findThinkingOptionIndex([{ text: "α" }], "unknown"), -1);
 });

@@ -8,8 +8,9 @@ const source = fs.readFileSync(
   path.join(__dirname, "..", "background.js"),
   "utf8"
 );
+const sharedSource = fs.readFileSync(path.join(__dirname, "..", "shared.js"), "utf8");
 
-function loadBackground() {
+function loadBackground(stored = { model: "pro-3.1", extendedThinking: false }) {
   const calls = [];
   let commandListener = null;
   let messageListener = null;
@@ -30,9 +31,9 @@ function loadBackground() {
     },
     storage: {
       sync: {
-        async get(defaults) {
-          calls.push(["storageGet", defaults]);
-          return { model: "pro-3.1", extendedThinking: false };
+        async get(keys) {
+          calls.push(["storageGet", keys]);
+          return Object.fromEntries(keys.filter((key) => key in stored).map((key) => [key, stored[key]]));
         }
       }
     },
@@ -52,10 +53,12 @@ function loadBackground() {
     }
   };
 
-  vm.runInContext(
-    source,
-    vm.createContext({ chrome, console, setTimeout, clearTimeout })
-  );
+  const context = vm.createContext({ chrome, console, setTimeout, clearTimeout });
+  context.importScripts = (name) => {
+    assert.equal(name, "shared.js");
+    vm.runInContext(sharedSource, context);
+  };
+  vm.runInContext(source, context);
   return { calls, commandListener, messageListener };
 }
 
@@ -85,9 +88,10 @@ test("opens a new active Gemini tab and focuses its composer", async () => {
     42,
     {
       type: "GEMINI_DEFAULT_MODEL_APPLY",
-      settings: { model: "pro-3.1", extendedThinking: false },
+      settings: { model: "pro-3.1", thinkingLevel: "low", extendedThinking: false },
       focusComposer: true,
-      waitForUi: true
+      waitForUi: true,
+      initialApplication: true
     }
   ]);
 });
@@ -108,16 +112,20 @@ test("ignores unrelated commands and runtime messages", () => {
   assert.equal(calls.length, 0);
 });
 
-test("queries storage with default settings for flash-3.8", async () => {
+test("reads raw storage keys before migration", async () => {
   const { calls, messageListener } = loadBackground();
   await sendRuntimeMessage(messageListener, {
     type: "GEMINI_OPEN_NEW_TAB"
   });
 
   const storageCall = calls.find(([name]) => name === "storageGet");
-  assert.deepEqual(toPlain(storageCall[1]), {
-    model: "flash-3.8",
-    extendedThinking: true
-  });
+  assert.deepEqual(toPlain(storageCall[1]), ["model", "thinkingLevel", "extendedThinking"]);
+});
+
+test("opens Gemini with defaults when storage is empty", async () => {
+  const { calls, messageListener } = loadBackground({});
+  await sendRuntimeMessage(messageListener, { type: "GEMINI_OPEN_NEW_TAB" });
+  const settings = calls.find(([name]) => name === "sendMessage")[2].settings;
+  assert.deepEqual(toPlain(settings), { model: "flash-3.8", thinkingLevel: "high", extendedThinking: true });
 });
 

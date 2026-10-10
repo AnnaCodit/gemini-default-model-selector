@@ -6,11 +6,11 @@ Gemini Default Model Selector
 
 ## Summary
 
-Automatically applies your preferred Gemini model and Extended thinking setting when Gemini opens.
+Automatically applies your preferred Gemini model and thinking level when Gemini opens.
 
 ## Description
 
-Choose the Gemini model you want to use by default and keep Extended thinking enabled or disabled across visits.
+Choose the Gemini model and thinking level you want to use by default across visits.
 
 Gemini Default Model Selector automatically applies your saved preferences when you open gemini.google.com. You can still switch models manually for the current tab—the extension will not override that choice until the page is reloaded.
 
@@ -18,7 +18,8 @@ Gemini Default Model Selector automatically applies your saved preferences when 
 
 - Choose 3.5 Flash-Lite, 3.8 Flash, or 3.1 Pro.
 - Graceful fallback to 3.7 Flash while Google progressively rolls out 3.8 Flash.
-- Save the Extended thinking setting.
+- Save a Low, Medium, or High thinking level independently of Gemini's interface language.
+- Support the legacy Extended thinking toggle: Low disables it; Medium and High enable it.
 - Apply saved preferences automatically when Gemini opens.
 - Keep manual model changes for the current tab.
 - Return focus to the prompt after switching.
@@ -34,16 +35,16 @@ This extension is not affiliated with Google. Gemini is a trademark of Google LL
 
 ## Single purpose
 
-Remember and apply the user's preferred Gemini model and Extended thinking setting on gemini.google.com.
+Remember and apply the user's preferred Gemini model and thinking level on gemini.google.com.
 
 ## Permission justification
 
-- `storage`: Stores the selected model identifier and Extended thinking preference in Chrome Sync.
+- `storage`: Stores the selected model identifier and thinking level in Chrome Sync, retaining a compatible legacy Boolean preference.
 - `https://gemini.google.com/*`: Reads and operates Gemini's model controls only on Gemini pages.
 
 ## Privacy disclosure
 
-The extension does not collect, sell, or transmit personal data. It stores only the selected model identifier and a Boolean Extended thinking preference through `chrome.storage.sync`.
+The extension does not collect, sell, or transmit personal data. It stores only the selected model identifier, thinking level, and compatible legacy Boolean preference through `chrome.storage.sync`.
 
 ## Store images
 

@@ -41,13 +41,23 @@
           </span>
         </label>
       </fieldset>
-      <label class="thinking-option">
-        <strong>Extended thinking</strong>
-        <span class="switch">
-          <input id="extended-thinking" type="checkbox">
-          <span class="switch-track" aria-hidden="true"></span>
-        </span>
-      </label>
+      <fieldset class="thinking-section">
+        <legend>Thinking level</legend>
+        <div class="thinking-grid">
+          <label class="thinking-pill">
+            <input type="radio" name="thinkingLevel" value="low">
+            <span class="pill-label">Low</span>
+          </label>
+          <label class="thinking-pill">
+            <input type="radio" name="thinkingLevel" value="medium">
+            <span class="pill-label">Medium</span>
+          </label>
+          <label class="thinking-pill">
+            <input type="radio" name="thinkingLevel" value="high">
+            <span class="pill-label">High</span>
+          </label>
+        </div>
+      </fieldset>
     </section>
     <p id="status" class="status" role="status" aria-live="polite"> Loading settings… </p>
     <section class="gemini-shortcut" aria-label="Open Gemini shortcut">

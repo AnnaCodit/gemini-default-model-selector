@@ -195,64 +195,78 @@ legend {
 }
 
 .model-option:focus-within,
-.thinking-option:focus-within {
+.thinking-pill:focus-within {
   outline: 3px solid rgb(82 111 243 / 28%);
   outline-offset: 2px;
 }
 
-.model-copy,
-.thinking-option>strong {
+.model-copy {
   display: block;
 }
 
-.model-copy strong,
-.thinking-option strong {
+.model-copy strong {
   font-size: 13px;
   font-weight: 680;
 }
 
-.thinking-option {
-  justify-content: space-between;
-  margin-top: 12px;
-  padding: 13px;
+.thinking-section {
+  margin-top: 14px;
+}
+
+.thinking-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid #dfe3eb;
   border-radius: 13px;
-  cursor: pointer;
+  background: #edf1f7;
 }
 
-.switch {
+.thinking-pill {
   position: relative;
-  flex: 0 0 auto;
-  width: 42px;
-  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px;
+  border-radius: 9px;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
 }
 
-.switch-track {
+.thinking-pill input {
   position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: #aeb5bf;
-  transition: background-color 150ms ease;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-.switch-track::after {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
+.pill-label {
+  color: #5f6368;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.thinking-pill:hover .pill-label {
+  color: #202124;
+}
+
+.thinking-pill:has(input:checked) {
   background: #fff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 24%);
-  content: "";
-  transition: transform 150ms ease;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 1px 2px rgb(0 0 0 / 8%);
 }
 
-.switch input:checked+.switch-track {
-  background: #526ff3;
-}
-
-.switch input:checked+.switch-track::after {
-  transform: translateX(18px);
+.thinking-pill:has(input:checked) .pill-label {
+  color: #526ff3;
+  font-weight: 700;
 }
 
 .status {
@@ -290,10 +304,31 @@ legend {
   }
 
   .model-option,
-  .thinking-option,
   .open-gemini {
     border-color: #3b4049;
     background: #22252a;
+  }
+
+  .thinking-grid {
+    border-color: #3b4049;
+    background: #17191d;
+  }
+
+  .pill-label {
+    color: #9aa0a6;
+  }
+
+  .thinking-pill:hover .pill-label {
+    color: #e8eaed;
+  }
+
+  .thinking-pill:has(input:checked) {
+    background: #262d45;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+  }
+
+  .thinking-pill:has(input:checked) .pill-label {
+    color: #8aa2ff;
   }
 
   .open-gemini {

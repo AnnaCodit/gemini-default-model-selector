@@ -29,8 +29,12 @@
     })
   ]);
 
+  const THINKING_LEVELS = Object.freeze(["low", "medium", "high"]);
+  const STORAGE_KEYS = Object.freeze(["model", "thinkingLevel", "extendedThinking"]);
+
   const DEFAULT_SETTINGS = Object.freeze({
     model: "flash-3.8",
+    thinkingLevel: "high",
     extendedThinking: true
   });
 
@@ -43,12 +47,19 @@
       model = "flash-3.8";
     }
 
+    let thinkingLevel = candidate.thinkingLevel;
+    if (!THINKING_LEVELS.includes(thinkingLevel)) {
+      if (typeof candidate.extendedThinking === "boolean") {
+        thinkingLevel = candidate.extendedThinking ? "high" : "low";
+      } else {
+        thinkingLevel = DEFAULT_SETTINGS.thinkingLevel;
+      }
+    }
+
     return {
       model: MODEL_IDS.has(model) ? model : DEFAULT_SETTINGS.model,
-      extendedThinking:
-        typeof candidate.extendedThinking === "boolean"
-          ? candidate.extendedThinking
-          : DEFAULT_SETTINGS.extendedThinking
+      thinkingLevel,
+      extendedThinking: thinkingLevel !== "low"
     };
   }
 
@@ -72,17 +83,7 @@
       model = "flash-3.8";
     }
 
-    return {
-      model,
-      extendedThinking: text.includes("extended")
-    };
-  }
-
-  function resolvePickerState(value, hasSecondaryText) {
-    return {
-      ...inferPickerState(value),
-      extendedThinking: Boolean(hasSecondaryText)
-    };
+    return { model };
   }
 
   function getModel(modelId) {
@@ -106,16 +107,9 @@
     return target;
   }
 
-  function findExtendedOptionIndex(options) {
+  function findThinkingOptions(options) {
     if (!Array.isArray(options)) {
-      return -1;
-    }
-
-    const afterSeparator = options.findIndex(
-      (option) => option?.followsSeparator === true
-    );
-    if (afterSeparator >= 0) {
-      return afterSeparator;
+      return null;
     }
 
     const nonModelIndexes = options
@@ -123,26 +117,64 @@
         index,
         text: normalizeText(option?.text).toLocaleLowerCase("en-US")
       }))
-      .filter(({ text }) =>
-        MODEL_OPTIONS.every(
+      .filter(({ text, index }) =>
+        !options[index]?.isModel && MODEL_OPTIONS.every(
           (model) =>
             !text.startsWith(model.menuPrefix.toLocaleLowerCase("en-US"))
         )
       )
       .map(({ index }) => index);
 
-    return nonModelIndexes.length === 1 ? nonModelIndexes[0] : -1;
+    const radioIndexes = nonModelIndexes.filter((index) => options[index]?.isRadio);
+    if (radioIndexes.length) {
+      return radioIndexes.length === 3
+        ? { kind: "levels", indexes: radioIndexes }
+        : null;
+    }
+
+    const groups = [];
+    for (const index of nonModelIndexes) {
+      if (!groups.length || options[index]?.followsSeparator) {
+        groups.push([]);
+      }
+      groups[groups.length - 1].push(index);
+    }
+    const levelGroups = groups.filter((group) => group.length === 3);
+    if (levelGroups.length === 1) {
+      return { kind: "levels", indexes: levelGroups[0] };
+    }
+
+    return nonModelIndexes.length === 1
+      ? { kind: "legacy", indexes: nonModelIndexes }
+      : null;
+  }
+
+  function findThinkingOptionIndex(options, targetLevel) {
+    if (!THINKING_LEVELS.includes(targetLevel)) {
+      return -1;
+    }
+    const info = findThinkingOptions(options);
+    return info
+      ? info.indexes[info.kind === "legacy" ? 0 : THINKING_LEVELS.indexOf(targetLevel)]
+      : -1;
+  }
+
+  function findExtendedOptionIndex(options) {
+    return findThinkingOptionIndex(options, "high");
   }
 
   globalScope.GeminiDefaultModelCore = Object.freeze({
     DEFAULT_SETTINGS,
     MODEL_OPTIONS,
+    STORAGE_KEYS,
+    THINKING_LEVELS,
     findExtendedOptionIndex,
+    findThinkingOptionIndex,
+    findThinkingOptions,
     getModel,
     inferPickerState,
     normalizeSettings,
     normalizeText,
-    resolveModelWithFallback,
-    resolvePickerState
+    resolveModelWithFallback
   });
 })(globalThis);

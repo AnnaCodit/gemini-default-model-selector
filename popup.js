@@ -6,7 +6,6 @@
   const OPEN_GEMINI_MESSAGE = "GEMINI_OPEN_NEW_TAB";
   const OPEN_GEMINI_COMMAND = "open-gemini";
   const settingsPanel = document.querySelector("#settings-panel");
-  const extendedInput = document.querySelector("#extended-thinking");
   const openGeminiButton = document.querySelector("#open-gemini");
   const shortcutLabel = document.querySelector("#open-gemini-shortcut");
   const shortcutChangeButton = document.querySelector(
@@ -39,9 +38,12 @@
     const checkedModel = settingsPanel.querySelector(
       'input[name="model"]:checked'
     );
+    const checkedThinking = settingsPanel.querySelector(
+      'input[name="thinkingLevel"]:checked'
+    );
     return core.normalizeSettings({
       model: checkedModel?.value,
-      extendedThinking: extendedInput.checked
+      thinkingLevel: checkedThinking?.value
     });
   }
 
@@ -52,7 +54,12 @@
     if (modelInput) {
       modelInput.checked = true;
     }
-    extendedInput.checked = settings.extendedThinking;
+    const thinkingInput = settingsPanel.querySelector(
+      `input[name="thinkingLevel"][value="${settings.thinkingLevel}"]`
+    );
+    if (thinkingInput) {
+      thinkingInput.checked = true;
+    }
   }
 
   async function saveSettings(settings) {
@@ -156,7 +163,7 @@
     }
   });
 
-  chrome.storage.sync.get(core.DEFAULT_SETTINGS, (storedSettings) => {
+  chrome.storage.sync.get(core.STORAGE_KEYS, (storedSettings) => {
     const settings = core.normalizeSettings(storedSettings);
     writeForm(settings);
     setStatus("Changes save automatically");

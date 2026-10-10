@@ -1,5 +1,9 @@
+importScripts("shared.js");
+
 (function initializeBackground() {
   "use strict";
+
+  const core = globalThis.GeminiDefaultModelCore;
 
   const OPEN_GEMINI_COMMAND = "open-gemini";
   const OPEN_GEMINI_MESSAGE = "GEMINI_OPEN_NEW_TAB";
@@ -7,10 +11,6 @@
   const GEMINI_URL = "https://gemini.google.com/app";
   const CONNECTION_TIMEOUT_MS = 30_000;
   const CONNECTION_RETRY_MS = 250;
-  const DEFAULT_SETTINGS = {
-    model: "flash-3.8",
-    extendedThinking: true
-  };
 
   function delay(durationMs) {
     return new Promise((resolve) => setTimeout(resolve, durationMs));
@@ -44,12 +44,15 @@
       throw new Error("Could not open a Gemini tab.");
     }
 
-    const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+    const settings = core.normalizeSettings(
+      await chrome.storage.sync.get(core.STORAGE_KEYS)
+    );
     const result = await sendMessageWhenReady(tab.id, {
       type: APPLY_MESSAGE,
       settings,
       focusComposer: true,
-      waitForUi: true
+      waitForUi: true,
+      initialApplication: true
     });
 
     if (!result?.ok || !result.applied) {

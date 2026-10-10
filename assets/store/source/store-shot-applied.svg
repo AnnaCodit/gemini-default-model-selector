@@ -21,22 +21,22 @@
   <image x="88" y="67" width="42" height="42" xlink:href="icon-48.png"/>
   <text x="144" y="95" fill="#B9C1D8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="650">Gemini Default Model Selector</text>
   <text x="88" y="183" fill="#F5F7FF" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700" letter-spacing="-1.6">
-    <tspan x="88" dy="0">Your preferred model is ready</tspan>
-    <tspan x="88" dy="58">when Gemini opens.</tspan>
+    <tspan x="88" dy="0">Your model and thinking level</tspan>
+    <tspan x="88" dy="58">are ready when Gemini opens.</tspan>
   </text>
-  <text x="88" y="286" fill="#ADB6CE" font-family="Segoe UI, Arial, sans-serif" font-size="21">Model and Extended thinking are applied automatically.</text>
+  <text x="88" y="286" fill="#ADB6CE" font-family="Segoe UI, Arial, sans-serif" font-size="21">Your saved preferences are applied automatically.</text>
   <g filter="url(#frameShadow)">
-    <rect x="166" y="336" width="1026" height="420" rx="24" fill="#18191D" stroke="#424654"/>
+    <rect x="166" y="320" width="1026" height="452" rx="24" fill="#18191D" stroke="#424654"/>
   </g>
-  <path d="M166 360C166 346.745 176.745 336 190 336H1168C1181.25 336 1192 346.745 1192 360V380H166V360Z" fill="#252730"/>
-  <circle cx="192" cy="358" r="5" fill="#626779"/>
-  <circle cx="210" cy="358" r="5" fill="#626779"/>
-  <circle cx="228" cy="358" r="5" fill="#626779"/>
-  <rect x="250" y="347" width="420" height="22" rx="11" fill="#343743"/>
-  <clipPath id="captureClip"><rect x="183" y="395" width="990" height="344" rx="8"/></clipPath>
+  <path d="M166 344C166 330.745 176.745 320 190 320H1168C1181.25 320 1192 330.745 1192 344V364H166V344Z" fill="#252730"/>
+  <circle cx="192" cy="342" r="5" fill="#626779"/>
+  <circle cx="210" cy="342" r="5" fill="#626779"/>
+  <circle cx="228" cy="342" r="5" fill="#626779"/>
+  <rect x="250" y="331" width="420" height="22" rx="11" fill="#343743"/>
+  <clipPath id="captureClip"><rect x="183" y="375" width="990" height="380" rx="8"/></clipPath>
   <g clip-path="url(#captureClip)">
-    <rect x="183" y="395" width="990" height="344" fill="#111216"/>
-    <image x="261" y="388" width="900" height="418" xlink:href="gemini-model-menu-crop.png"/>
+    <rect x="183" y="375" width="990" height="380" fill="#0F0F0F"/>
+    <image x="183" y="375" width="990" height="380" preserveAspectRatio="xMidYMid meet" xlink:href="gemini-model-menu-crop.png"/>
   </g>
   <g filter="url(#badgeShadow)">
     <rect x="927" y="238" width="249" height="52" rx="26" fill="#526FF3"/>

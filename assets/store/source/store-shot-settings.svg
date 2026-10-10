@@ -18,12 +18,12 @@
   <image x="96" y="143" width="44" height="44" xlink:href="icon-48.png"/>
   <text x="154" y="172" fill="#586174" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="650">Gemini Default Model Selector</text>
   <text x="96" y="286" fill="#172033" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="-2">
-    <tspan x="96" dy="0">Set your preferred</tspan>
-    <tspan x="96" dy="63">model once.</tspan>
+    <tspan x="96" dy="0">Your model.</tspan>
+    <tspan x="96" dy="63">Your thinking level.</tspan>
   </text>
   <text x="96" y="440" fill="#5F687B" font-family="Segoe UI, Arial, sans-serif" font-size="22">
-    <tspan x="96" dy="0">Choose a model and Extended thinking.</tspan>
-    <tspan x="96" dy="33">Your settings are saved automatically.</tspan>
+    <tspan x="96" dy="0">Pick Low, Medium, or High.</tspan>
+    <tspan x="96" dy="33">Your preferences are saved automatically.</tspan>
   </text>
   <g filter="url(#cardShadow)">
     <rect x="776" y="116" width="380" height="568" rx="28" fill="#F8FAFD" stroke="#D8DCE7"/>
@@ -35,20 +35,30 @@
   </text>
   <text x="800" y="235" fill="#68717F" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="0.5">CHOOSE THE MODEL</text>
   <g font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#202124">
-    <rect x="800" y="251" width="332" height="62" rx="14" fill="#FFFFFF" stroke="#DFE3EB"/>
-    <circle cx="824" cy="282" r="9" fill="none" stroke="#9AA2AE" stroke-width="2"/>
-    <text x="848" y="287">3.5 Flash-Lite</text>
-    <rect x="800" y="322" width="332" height="62" rx="14" fill="#FFFFFF" stroke="#DFE3EB"/>
-    <circle cx="824" cy="353" r="9" fill="none" stroke="#9AA2AE" stroke-width="2"/>
-    <text x="848" y="358">3.8 Flash</text>
-    <rect x="800" y="393" width="332" height="62" rx="14" fill="#F2F6FF" stroke="#6B8CFF" stroke-width="2"/>
-    <circle cx="824" cy="424" r="9" fill="none" stroke="#526FF3" stroke-width="2"/>
-    <circle cx="824" cy="424" r="4.5" fill="#526FF3"/>
-    <text x="848" y="429">3.1 Pro</text>
-    <rect x="800" y="469" width="332" height="66" rx="14" fill="#FFFFFF" stroke="#DFE3EB"/>
-    <text x="814" y="509">Extended thinking</text>
+    <rect x="800" y="251" width="332" height="54" rx="14" fill="#FFFFFF" stroke="#DFE3EB"/>
+    <circle cx="824" cy="278" r="9" fill="none" stroke="#9AA2AE" stroke-width="2"/>
+    <text x="848" y="283">3.5 Flash-Lite</text>
+    <rect x="800" y="314" width="332" height="54" rx="14" fill="#F2F6FF" stroke="#6B8CFF" stroke-width="2"/>
+    <circle cx="824" cy="341" r="9" fill="none" stroke="#526FF3" stroke-width="2"/>
+    <circle cx="824" cy="341" r="4.5" fill="#526FF3"/>
+    <text x="848" y="346">3.8 Flash</text>
+    <rect x="800" y="377" width="332" height="54" rx="14" fill="#FFFFFF" stroke="#DFE3EB"/>
+    <circle cx="824" cy="404" r="9" fill="none" stroke="#9AA2AE" stroke-width="2"/>
+    <text x="848" y="409">3.1 Pro</text>
   </g>
-  <rect x="1069" y="490" width="44" height="25" rx="12.5" fill="#526FF3"/>
-  <circle cx="1100" cy="502.5" r="9.5" fill="#FFFFFF"/>
-  <text x="966" y="568" fill="#137333" font-family="Segoe UI, Arial, sans-serif" font-size="12" text-anchor="middle">Saved and applied.</text>
+  <text x="800" y="459" fill="#68717F" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="0.5">THINKING LEVEL</text>
+  <rect x="800" y="471" width="332" height="49" rx="14" fill="#EDF1F7" stroke="#DFE3EB"/>
+  <rect x="1022" y="476" width="105" height="39" rx="10" fill="#FFFFFF" stroke="#E3E7EF"/>
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="650" text-anchor="middle">
+    <text x="855" y="501" fill="#5F6368">Low</text>
+    <text x="966" y="501" fill="#5F6368">Medium</text>
+    <text x="1075" y="501" fill="#526FF3" font-weight="700">High</text>
+  </g>
+  <text x="966" y="550" fill="#137333" font-family="Segoe UI, Arial, sans-serif" font-size="12" text-anchor="middle">Saved and applied.</text>
+  <rect x="800" y="575" width="269" height="48" rx="14" fill="#FFFFFF" stroke="#DFE3EB"/>
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="650">
+    <text x="815" y="604" fill="#202124">Open Gemini</text>
+    <text x="1054" y="604" fill="#202124" text-anchor="end">(Alt+G)</text>
+    <text x="1104" y="604" fill="#526FF3" text-anchor="middle">Change</text>
+  </g>
 </svg>

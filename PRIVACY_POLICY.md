@@ -1,6 +1,6 @@
 # Privacy Policy for Gemini Default Model Selector
 
-**Last Updated:** August 15, 2026
+**Last Updated:** October 10, 2026
 
 ## 1. Overview
 This Privacy Policy describes how the **Gemini Default Model Selector** Chrome Extension ("Extension", "we", "us", or "our") handles your data. We are committed to protecting user privacy. This Extension is designed to operate locally on your browser with strict data minimization principles.
@@ -11,7 +11,7 @@ This Privacy Policy describes how the **Gemini Default Model Selector** Chrome E
 ### Stored Data
 The Extension stores only non-personally identifiable preference settings locally on your device:
 - Selected preferred Gemini model identifier (e.g., `3.5 Flash-Lite`, `3.8 Flash`, `3.1 Pro`)
-- Selected state for the Extended thinking toggle (enabled/disabled)
+- Selected thinking level (`low`, `medium`, or `high`) and its compatible legacy Extended thinking state (enabled/disabled)
 
 These preferences are saved using Chrome's native `chrome.storage.sync` API. If you are signed into Google Chrome with Chrome Sync enabled, Chrome may synchronize these preference settings across your logged-in browser instances using Google's infrastructure. We do not have access to your Google Account or external storage servers.
 
