@@ -11,6 +11,7 @@
   const MAX_INTERACTION_ATTEMPTS = 2;
   const MENU_ITEM_SELECTOR =
     '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="radio"], input[type="radio"]';
+  const SUBMENU_TRIGGER_SELECTOR = '[aria-haspopup="menu"], [aria-haspopup="true"]';
 
   let currentSettings = core.DEFAULT_SETTINGS;
   let rawSettings = {};
@@ -167,6 +168,15 @@
     return menu;
   }
 
+  function getMenuItems(menu) {
+    const items = Array.from(menu.querySelectorAll(
+      `${MENU_ITEM_SELECTOR}, ${SUBMENU_TRIGGER_SELECTOR}`
+    )).filter(isVisible);
+    return items.filter((item) =>
+      !items.some((other) => other !== item && other.contains(item))
+    );
+  }
+
   function getVisibleMenuItems() {
     const picker = findModePicker();
     if (picker?.getAttribute("aria-expanded") !== "true") {
@@ -177,10 +187,65 @@
       return [];
     }
 
-    const items = Array.from(menu.querySelectorAll(MENU_ITEM_SELECTOR)).filter(isVisible);
-    return items.filter((item) =>
-      !items.some((other) => other !== item && other.contains(item))
-    );
+    return getMenuItems(menu);
+  }
+
+  function getSubmenuTrigger(item) {
+    return item.matches(SUBMENU_TRIGGER_SELECTOR)
+      ? item : item.querySelector(SUBMENU_TRIGGER_SELECTOR);
+  }
+
+  function findThinkingSubmenuTrigger(items = getVisibleMenuItems()) {
+    const triggers = items.filter((item) =>
+      !item.hasAttribute("data-mode-id") &&
+      !core.MODEL_OPTIONS.some((model) => findMenuItem([item], model.menuPrefix))
+    ).map(getSubmenuTrigger).filter(Boolean);
+    return triggers.length === 1 ? triggers[0] : null;
+  }
+
+  function findThinkingSubmenu(trigger = findThinkingSubmenuTrigger()) {
+    if (!trigger) return null;
+    const controlledIds = `${trigger.getAttribute("aria-controls") || ""} ${
+      trigger.getAttribute("aria-owns") || ""
+    }`.trim().split(/\s+/).filter(Boolean);
+    const controlled = controlledIds.map((id) => document.getElementById(id))
+      .find((element) => element && isVisible(element));
+    if (controlled) return controlled;
+
+    const triggerId = trigger.getAttribute("id");
+    const candidates = Array.from(document.querySelectorAll('[role="menu"]'))
+      .filter((menu) => isVisible(menu) && (trigger.contains(menu) ||
+        (triggerId && (menu.getAttribute("aria-labelledby") || "").split(/\s+/).includes(triggerId))));
+    return candidates.length === 1 ? candidates[0] : null;
+  }
+
+  function getVisibleThinkingMenuInfo() {
+    const items = getVisibleMenuItems();
+    const submenu = findThinkingSubmenu(findThinkingSubmenuTrigger(items));
+    return getThinkingMenuInfo(submenu ? getMenuItems(submenu) : items);
+  }
+
+  async function openThinkingMenu() {
+    if (!await openModeMenu()) return null;
+    const ready = await waitFor(() => {
+      const items = getVisibleMenuItems();
+      const trigger = findThinkingSubmenuTrigger(items);
+      if (trigger) return isControlEnabled(trigger) ? { trigger } : null;
+      return readThinkingMenuState(getThinkingMenuInfo(items)) ? {} : null;
+    }, UI_TIMEOUT_MS);
+    if (!ready) return null;
+    if (ready.trigger && !findThinkingSubmenu(ready.trigger)) {
+      ready.trigger.click();
+      if (!findThinkingSubmenu(ready.trigger) && ready.trigger.getAttribute("aria-expanded") !== "true") {
+        // Некоторые варианты меню открывают вложенный список только наведением.
+        ready.trigger.dispatchEvent(new MouseEvent("mouseenter"));
+        ready.trigger.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      }
+    }
+    return waitFor(() => {
+      const info = getVisibleThinkingMenuInfo();
+      return readThinkingMenuState(info) ? info : null;
+    }, UI_TIMEOUT_MS);
   }
 
   function waitFor(getValue, timeoutMs, stableMs = 0) {
@@ -299,17 +364,30 @@
       : null;
   }
 
-  async function closeModeMenu() {
+  async function closeModeMenu(previousSubmenu = null) {
     const picker = findModePicker();
     if (!picker) {
       return;
     }
 
     const menu = findModeMenu(picker);
-    if (picker.getAttribute("aria-expanded") === "true") {
+    const submenu = findThinkingSubmenu() || previousSubmenu;
+    if (submenu && isVisible(submenu)) {
+      // Вложенный popover может поглощать Escape: сначала закрываем его,
+      // затем родительское меню, если оно осталось открытым.
+      submenu.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Escape", code: "Escape", keyCode: 27, which: 27,
+        bubbles: true, cancelable: true
+      }));
+      if (!await waitFor(() => !isVisible(submenu), UI_TIMEOUT_MS)) {
+        throw new Error("Gemini did not close the thinking submenu.");
+      }
+    }
+    const currentPicker = findModePicker() || picker;
+    if (currentPicker.getAttribute("aria-expanded") === "true") {
       // Повторный click() по кнопке не гарантирует закрытие popover Gemini.
       // Escape закрывает само меню, не переключая его обратно в открытое состояние.
-      (menu || picker).dispatchEvent(new KeyboardEvent("keydown", {
+      (findModeMenu(currentPicker) || currentPicker).dispatchEvent(new KeyboardEvent("keydown", {
         key: "Escape", code: "Escape", keyCode: 27, which: 27,
         bubbles: true, cancelable: true
       }));
@@ -329,6 +407,7 @@
     const options = items.map((item) => ({
       text: item.textContent,
       isModel: item.hasAttribute("data-mode-id"),
+      isSubmenu: Boolean(getSubmenuTrigger(item)),
       isRadio: item.getAttribute("role") === "menuitemradio" ||
         item.getAttribute("role") === "radio" ||
         item.matches('input[type="radio"]') ||
@@ -388,6 +467,7 @@
     return {
       kind: "levels",
       targetLevel,
+      submenu: findThinkingSubmenu(),
       targetLabel: targetLabel && labels.filter((label) => label === targetLabel).length === 1
         ? targetLabel : null
     };
@@ -400,7 +480,7 @@
     }
 
     if (picker.getAttribute("aria-expanded") === "true") {
-      const state = readThinkingMenuState(getThinkingMenuInfo(getVisibleMenuItems()));
+      const state = readThinkingMenuState(getVisibleThinkingMenuInfo());
       return state?.kind === confirmation.kind &&
         matchesThinkingState(state, confirmation.targetLevel);
     }
@@ -417,7 +497,8 @@
     return waitFor(() => {
       const picker = findModePicker();
       return isControlEnabled(picker) && readPickerState(picker).model === modelId &&
-        isModeMenuClosed() && matchesThinkingConfirmation(confirmation);
+        isModeMenuClosed() && (!confirmation?.submenu || !isVisible(confirmation.submenu)) &&
+        matchesThinkingConfirmation(confirmation);
     }, UI_TIMEOUT_MS, STATE_STABLE_MS);
   }
 
@@ -443,7 +524,6 @@
 
       const selection = await waitFor(() => {
         const readyItems = getVisibleMenuItems();
-        if (!readThinkingMenuState(getThinkingMenuInfo(readyItems))) return null;
         let menuItem = findMenuItem(readyItems, model.menuPrefix);
         let effectiveModel = model;
         if (!menuItem && model.fallbackId) {
@@ -454,20 +534,30 @@
           }
         }
         return menuItem && isControlEnabled(menuItem)
-          ? { menuItem, effectiveModel, items: readyItems } : null;
+          ? { effectiveModel } : null;
       }, UI_TIMEOUT_MS);
       if (!selection) {
         throw new Error(`Could not find the ${model.label} model option.`);
       }
-      const { menuItem, effectiveModel } = selection;
+      const { effectiveModel } = selection;
 
-      const thinkingConfirmation = createThinkingConfirmation(
-        getThinkingMenuInfo(selection.items), targetLevel
-      );
+      const thinkingInfo = await openThinkingMenu();
+      const thinkingConfirmation = createThinkingConfirmation(thinkingInfo, targetLevel);
+      if (!thinkingConfirmation) {
+        throw new Error("The thinking levels could not be verified.");
+      }
       if (currentModel === effectiveModel.id) {
         return { modelId: effectiveModel.id, changed: false, thinkingConfirmation };
       }
 
+      // Открытие подменю может перерисовать пункты родительского меню.
+      const menuItem = await waitFor(() => {
+        const item = findMenuItem(getVisibleMenuItems(), effectiveModel.menuPrefix);
+        return isControlEnabled(item) ? item : null;
+      }, UI_TIMEOUT_MS);
+      if (!menuItem) {
+        throw new Error(`Could not find the ${effectiveModel.label} model option.`);
+      }
       menuItem.click();
 
       const applied = await waitFor(() => {
@@ -476,7 +566,7 @@
       }, UI_TIMEOUT_MS);
 
       if (applied) {
-        await closeModeMenu();
+        await closeModeMenu(thinkingConfirmation.submenu);
         return { modelId: effectiveModel.id, changed: true, thinkingConfirmation };
       }
     }
@@ -485,11 +575,11 @@
   }
 
   async function setThinkingLevel(targetLevel) {
-    if (!await openModeMenu()) {
-      throw new Error("Could not open the mode menu.");
+    if (!await openThinkingMenu()) {
+      throw new Error("The requested thinking level is not available or could not be verified.");
     }
     const ready = await waitFor(() => {
-      const info = getThinkingMenuInfo(getVisibleMenuItems());
+      const info = getVisibleThinkingMenuInfo();
       const confirmation = createThinkingConfirmation(info, targetLevel);
       if (!confirmation) return null;
       const selected = matchesThinkingState(readThinkingMenuState(info), targetLevel);
@@ -539,7 +629,7 @@
           changed ||= thinkingResult.changed;
           thinkingConfirmation = thinkingResult.confirmation;
         }
-        await closeModeMenu();
+        await closeModeMenu(thinkingConfirmation?.submenu);
         if (await waitForStableSettings(thinkingConfirmation, effectiveModelId)) {
           failed = false;
           return { applied: true, changed };
@@ -547,10 +637,12 @@
       }
       throw new Error("Gemini did not confirm the final model settings.");
     } finally {
-      if (findModePicker()?.getAttribute("aria-expanded") === "true") {
-        await closeModeMenu();
+      if (findModePicker()?.getAttribute("aria-expanded") === "true" ||
+          (thinkingConfirmation?.submenu && isVisible(thinkingConfirmation.submenu))) {
+        await closeModeMenu(thinkingConfirmation?.submenu);
       }
       if (isModeMenuClosed() &&
+        (!thinkingConfirmation?.submenu || !isVisible(thinkingConfirmation.submenu)) &&
         (failed || changed || options.focusComposer || selectionSnapshot.wasFocused)) {
         await restoreEditorFocus(
           selectionSnapshot,

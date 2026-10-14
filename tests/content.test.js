@@ -30,6 +30,8 @@ function loadContent(options = {}) {
   let menuOpenings = 0;
   let visibleMenuOpenings = 0;
   let menu;
+  let submenu;
+  let submenuTrigger;
   const levels = ["low", "medium", "high"];
   let labels = options.labels || ["Низкая", "Средний", "Высокая"];
   const stored = options.stored || { model: "flash-3.8", thinkingLevel: "high" };
@@ -37,7 +39,8 @@ function loadContent(options = {}) {
     "flash-lite-3.5": "3.5 Flash-Lite",
     "flash-3.8": "3.8 Flash",
     "flash-3.7": "3.7 Flash",
-    "pro-3.1": "3.1 Pro"
+    "pro-3.1": "3.1 Pro",
+    "argon-4": "4 Argon"
   };
 
   function setTimer(callback, ms) {
@@ -131,8 +134,14 @@ function loadContent(options = {}) {
     querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
     closest(selector) { return this.matches(selector) ? this : this.parentElement?.closest(selector) || null; }
     dispatchEvent(event) {
+      if (event.type === "mouseenter") this.onMouseEnter?.();
+      if (event.type !== "keydown") return true;
       keyboardEvents.push({ type: event.type, key: event.key, keyCode: event.keyCode,
         bubbles: event.bubbles, time: now });
+      if (submenu?.contains(this) && event.key === "Escape" && options.submenuEscapeOnly) {
+        closeSubmenu(true);
+        return true;
+      }
       if (menuOpen && event.type === "keydown" && event.key === "Escape" &&
         event.keyCode === 27 && event.bubbles && !options.ignoreEscape) closeMenu(true);
       return true;
@@ -209,6 +218,7 @@ function loadContent(options = {}) {
   function closeMenu(animate = false) {
     menuOpen = false;
     picker.attrs["aria-expanded"] = "false";
+    closeSubmenu(animate);
     if (menu) {
       const closingMenu = menu;
       const closingPanel = closingMenu.closest(".cdk-overlay-pane");
@@ -216,6 +226,15 @@ function loadContent(options = {}) {
       if (animate && options.menuCloseDelay) setTimer(removeMenu, options.menuCloseDelay);
       else removeMenu();
     }
+    notifyObservers();
+  }
+  function closeSubmenu(animate = false) {
+    if (submenuTrigger) submenuTrigger.attrs["aria-expanded"] = "false";
+    if (!submenu?.isConnected) return;
+    const closing = submenu;
+    const remove = () => { closing.remove(); notifyObservers(); };
+    if (animate && options.submenuCloseDelay) setTimer(remove, options.submenuCloseDelay);
+    else remove();
     notifyObservers();
   }
   function markSelected(item, selected) {
@@ -232,7 +251,7 @@ function loadContent(options = {}) {
       id: "mode-menu", role: "menu", "data-test-id": "gem-mode-menu"
     }));
     if (options.noMenuTestId) delete menu.attrs["data-test-id"];
-    for (const id of options.availableModels || ["flash-lite-3.5", "flash-3.8", "pro-3.1"]) {
+    for (const id of options.availableModels || ["flash-lite-3.5", "flash-3.8", "pro-3.1", "argon-4"]) {
       const item = menu.append(new Element("gem-menu-item", { role: "menuitem", "data-mode-id": id }, modelLabels[id]));
       markSelected(item, model === id);
       item.onClick = () => {
@@ -251,11 +270,46 @@ function loadContent(options = {}) {
       };
     }
     if (options.separator !== false) menu.append(new Element("mat-divider", { role: "separator" }));
+    if (options.nestedThinking) {
+      const attributes = { id: "thinking-trigger", role: "menuitem",
+        "aria-haspopup": "menu", "aria-expanded": "false" };
+      if (options.submenuLink !== "labelledby" && options.submenuLink !== "nested") {
+        attributes[options.submenuLink === "owns" ? "aria-owns" : "aria-controls"] = "thinking-menu";
+      }
+      submenuTrigger = menu.append(new Element("gem-menu-item", attributes, "Глубина мышления"));
+      const openSubmenu = () => {
+        submenuTrigger.attrs["aria-expanded"] = "true";
+        const show = () => {
+          if (!menuOpen) return;
+          submenu = (options.submenuLink === "nested" ? submenuTrigger : document)
+            .append(new Element("gem-menu", { id: "thinking-menu", role: "menu",
+              ...(options.submenuLink === "labelledby" ? { "aria-labelledby": "thinking-trigger" } : {}) }));
+          renderThinkingItems(submenu);
+          notifyObservers();
+        };
+        if (options.submenuDelay) setTimer(show, options.submenuDelay);
+        else show();
+      };
+      submenuTrigger.onClick = () => {
+        recordClick("thinking-submenu");
+        if (!options.ignoreSubmenuClicks && !options.hoverOnlySubmenu) openSubmenu();
+      };
+      submenuTrigger.onMouseEnter = () => {
+        if (options.hoverOnlySubmenu) { recordClick("thinking-hover"); openSubmenu(); }
+      };
+    } else renderThinkingItems(menu);
+    if (options.extraLegacyToggle) {
+      const legacy = menu.append(new Element("gem-menu-item", { role: "menuitemcheckbox" }, "Old"));
+      legacy.onClick = () => { clicks.push("unexpected-legacy"); };
+    }
+    notifyObservers();
+  }
+  function renderThinkingItems(container) {
     const menuLevels = options.legacy ? ["high"] : levels.slice(0, options.levelCount ?? 3);
     for (const itemLevel of menuLevels) {
       const nativeRadio = options.role === "native";
       const role = options.legacy ? "menuitemcheckbox" : options.role || "menuitem";
-      const item = menu.append(new Element(nativeRadio ? "input" : "gem-menu-item",
+      const item = container.append(new Element(nativeRadio ? "input" : "gem-menu-item",
         nativeRadio ? { type: "radio" } : { role }));
       const label = item.append(new Element("span", {}, ` ${labels[levels.indexOf(itemLevel)]} `));
       label.classes.add("label");
@@ -298,11 +352,6 @@ function loadContent(options = {}) {
         }, options.clickDelay ?? 100);
       };
     }
-    if (options.extraLegacyToggle) {
-      const legacy = menu.append(new Element("gem-menu-item", { role: "menuitemcheckbox" }, "Old"));
-      legacy.onClick = () => { clicks.push("unexpected-legacy"); };
-    }
-    notifyObservers();
   }
   picker.onClick = () => {
     recordClick("picker");
@@ -354,7 +403,7 @@ function loadContent(options = {}) {
   };
   const context = vm.createContext({
     document, chrome, HTMLElement: Element, HTMLTextAreaElement: TextArea,
-    KeyboardEvent: KeyEvent,
+    KeyboardEvent: KeyEvent, MouseEvent: KeyEvent,
     MutationObserver: Observer, Date: ClockDate,
     setTimeout: setTimer, clearTimeout: (id) => timers.delete(id),
     getComputedStyle: computedStyle,
@@ -958,4 +1007,106 @@ test("queued apply requests each use their own settings snapshot", async () => {
   assert.equal(first.response().ok, true);
   assert.equal(second.response().ok, true);
   assert.deepEqual(page.clicks.filter((value) => value !== "picker"), ["high", "low", "medium"]);
+});
+
+for (const target of ["low", "medium", "high"]) {
+  test(`selects nested ${target} using position and confirms it without reopening`, async () => {
+    const page = loadContent({ nestedThinking: true, initialLevel: target === "high" ? "medium" : "high",
+      labels: ["α", "β", "γ"], stored: { model: "flash-3.8", thinkingLevel: target },
+      unrelatedMenu: true, clickDelay: 0 });
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.deepEqual(page.state(), { model: "flash-3.8", level: target, menuOpen: false });
+    assert.deepEqual(page.clicks, ["picker", "thinking-submenu", target]);
+    assert.deepEqual(page.openings(), { total: 1, visible: 1 });
+    const clicked = page.clickTimes.find((entry) => entry.value === target);
+    const focused = page.focusTimes.find((entry) => entry.target === "TEXTAREA");
+    assert.equal(focused.time - clicked.time, 200);
+    assert.equal(page.document.querySelector('#thinking-menu'), null);
+    assert.equal(page.editor.value, "draft");
+  });
+}
+
+for (const submenuLink of ["owns", "labelledby", "nested"]) {
+  test(`finds the thinking submenu through ${submenuLink} without using unrelated menus`, async () => {
+    const page = loadContent({ nestedThinking: true, submenuLink, unrelatedMenu: true,
+      initialLevel: "medium", role: "menuitemradio", indicator: "aria", noControls: true });
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.equal(page.state().level, "high");
+    assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "high"]);
+  });
+}
+
+test("selects Argon while preserving thinking with one opening", async () => {
+  const page = loadContent({ nestedThinking: true, initialLevel: "medium",
+    stored: { model: "argon-4", thinkingLevel: "medium" } });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.state(), { model: "argon-4", level: "medium", menuOpen: false });
+  assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "argon-4"]);
+  assert.deepEqual(page.openings(), { total: 1, visible: 1 });
+});
+
+test("restores nested thinking after Argon resets it", async () => {
+  const page = loadContent({ nestedThinking: true, initialLevel: "high", resetThinkingOnModelChange: true,
+    stored: { model: "argon-4", thinkingLevel: "medium" } });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.state(), { model: "argon-4", level: "medium", menuOpen: false });
+  assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "argon-4", "picker", "thinking-submenu", "medium"]);
+  assert.deepEqual(page.openings(), { total: 2, visible: 2 });
+});
+
+test("already selected nested thinking closes both menus without clicking the level", async () => {
+  const page = loadContent({ nestedThinking: true, initialLevel: "high", submenuEscapeOnly: true,
+    submenuCloseDelay: 120, menuCloseDelay: 80, editorFocused: false });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.clicks, ["picker", "thinking-submenu"]);
+  assert.deepEqual(page.keyboardEvents.map((entry) => entry.key), ["Escape", "Escape"]);
+  assert.equal(page.state().menuOpen, false);
+  assert.equal(page.document.querySelector('#thinking-menu'), null);
+  assert.notEqual(page.document.activeElement, page.editor);
+});
+
+test("waits for nested options and selection indicators without fixed delays", async () => {
+  const page = loadContent({ nestedThinking: true, submenuDelay: 120, selectionDelay: 60,
+    initialLevel: "medium", disabledLevel: "high", enableLevelAfter: 75, clickDelay: 0 });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "high"]);
+  const opened = page.clickTimes.find((entry) => entry.value === "thinking-submenu");
+  const chosen = page.clickTimes.find((entry) => entry.value === "high");
+  assert.equal(chosen.time - opened.time, 195);
+});
+
+test("a submenu that never opens is not clicked as a legacy toggle", async () => {
+  const page = loadContent({ nestedThinking: true, ignoreSubmenuClicks: true });
+  await page.start();
+  assert(page.errors.length > 0);
+  assert.deepEqual(page.clicks, ["picker", "thinking-submenu"]);
+  assert.equal(page.state().level, "low");
+  assert.equal(page.state().menuOpen, false);
+});
+
+test("opens a hover-only thinking submenu without an extra fixed pause", async () => {
+  const page = loadContent({ nestedThinking: true, hoverOnlySubmenu: true, clickDelay: 0 });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "thinking-hover", "high"]);
+  assert.equal(page.state().level, "high");
+  const opened = page.clickTimes.find((entry) => entry.value === "picker");
+  const chosen = page.clickTimes.find((entry) => entry.value === "high");
+  assert.equal(chosen.time, opened.time);
+});
+
+test("waits for an independently closing submenu before restoring focus", async () => {
+  const page = loadContent({ nestedThinking: true, submenuCloseDelay: 340, clickDelay: 0 });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  const chosen = page.clickTimes.find((entry) => entry.value === "high");
+  const focused = page.focusTimes.find((entry) => entry.target === "TEXTAREA");
+  assert(focused.time - chosen.time >= 540);
+  assert.equal(page.document.querySelector('#thinking-menu'), null);
 });

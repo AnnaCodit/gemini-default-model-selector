@@ -22,6 +22,12 @@
       menuPrefix: "3.7 Flash"
     }),
     Object.freeze({
+      id: "argon-4",
+      label: "4 Argon",
+      description: "Advanced reasoning",
+      menuPrefix: "4 Argon"
+    }),
+    Object.freeze({
       id: "pro-3.1",
       label: "3.1 Pro",
       description: "Advanced math and code",
@@ -73,7 +79,9 @@
     const text = normalizeText(value).toLocaleLowerCase("en-US");
     let model = null;
 
-    if (text.includes("flash-lite") || text.includes("3.5 flash")) {
+    if (text.includes("argon")) {
+      model = "argon-4";
+    } else if (text.includes("flash-lite") || text.includes("3.5 flash")) {
       model = "flash-lite-3.5";
     } else if (text.includes("pro") || text.includes("3.1")) {
       model = "pro-3.1";
@@ -118,7 +126,9 @@
         text: normalizeText(option?.text).toLocaleLowerCase("en-US")
       }))
       .filter(({ text, index }) =>
-        !options[index]?.isModel && MODEL_OPTIONS.every(
+        !options[index]?.isModel &&
+        !options[index]?.isSubmenu &&
+        MODEL_OPTIONS.every(
           (model) =>
             !text.startsWith(model.menuPrefix.toLocaleLowerCase("en-US"))
         )

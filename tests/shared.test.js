@@ -21,6 +21,10 @@ test("normalizes valid settings with thinkingLevel", () => {
     { ...core.normalizeSettings({ model: "pro-3.1", thinkingLevel: "low" }) },
     { model: "pro-3.1", thinkingLevel: "low", extendedThinking: false }
   );
+  assert.deepEqual(
+    { ...core.normalizeSettings({ model: "argon-4", thinkingLevel: "medium" }) },
+    { model: "argon-4", thinkingLevel: "medium", extendedThinking: true }
+  );
 });
 
 test("migrates legacy extendedThinking boolean to thinkingLevel", () => {
@@ -60,6 +64,11 @@ test("infers every Gemini model from picker text", () => {
     core.inferPickerState("Open mode picker, currently Pro").model,
     "pro-3.1"
   );
+  assert.equal(
+    core.inferPickerState("Open mode picker, currently 4 Argon").model,
+    "argon-4"
+  );
+  assert.equal(core.inferPickerState("Argon").model, "argon-4");
   assert.equal(
     core.inferPickerState("Open mode picker, currently Flash Extended").model,
     "flash-3.8"
@@ -170,6 +179,29 @@ test("prefers three radio options when a legacy checkbox is also present", () =>
     { text: "α", isRadio: true }, { text: "β", isRadio: true }, { text: "γ", isRadio: true }
   ];
   assert.equal(core.findThinkingOptionIndex(options, "medium"), 3);
+});
+
+test("ignores submenu triggers when looking for thinking options", () => {
+  const modelMenu = [
+    { text: "3.5 Flash-Lite", isModel: true },
+    { text: "3.8 Flash", isModel: true },
+    { text: "4 Argon", isModel: true },
+    { text: "3.1 Pro", isModel: true },
+    { text: "More models", isSubmenu: true }
+  ];
+  assert.equal(core.findThinkingOptions(modelMenu), null);
+
+  const optionsWithLevels = [
+    { text: "3.8 Flash", isModel: true },
+    { text: "Thinking levels", isSubmenu: true },
+    { text: "α", isRadio: true },
+    { text: "β", isRadio: true },
+    { text: "γ", isRadio: true }
+  ];
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(core.findThinkingOptions(optionsWithLevels))),
+    { kind: "levels", indexes: [2, 3, 4] }
+  );
 });
 
 test("rejects incomplete or ambiguous thinking groups", () => {

@@ -8,6 +8,10 @@ const sharedSource = fs.readFileSync(
   path.join(__dirname, "..", "shared.js"),
   "utf8"
 );
+const popupHtml = fs.readFileSync(
+  path.join(__dirname, "..", "popup.html"),
+  "utf8"
+);
 const popupSource = fs.readFileSync(
   path.join(__dirname, "..", "popup.js"),
   "utf8"
@@ -54,11 +58,12 @@ function createPopupMock(initialStorage = {}) {
     "#status": { textContent: "", dataset: {}, replaceChildren() {} }
   };
 
-  const models = [
-    { name: "model", value: "flash-lite-3.5", checked: false },
-    { name: "model", value: "flash-3.8", checked: false },
-    { name: "model", value: "pro-3.1", checked: false }
-  ];
+  const models = Array.from(
+    popupHtml.matchAll(
+      /<input\b(?=[^>]*\bname="model")(?=[^>]*\bvalue="([^"]+)")[^>]*>/g
+    ),
+    (match) => ({ name: "model", value: match[1], checked: false })
+  );
 
   const thinkings = [
     { name: "thinkingLevel", value: "low", checked: false },
@@ -142,6 +147,11 @@ test("loads settings into popup inputs", () => {
   assert.equal(thinkings.find((t) => t.value === "medium").checked, true);
 });
 
+test("loads the Argon model from storage into its popup input", () => {
+  const { models } = createPopupMock({ model: "argon-4" });
+  assert.equal(models.find((model) => model.value === "argon-4")?.checked, true);
+});
+
 test("migrates a disabled legacy preference when the popup loads", () => {
   const mock = createPopupMock({ extendedThinking: false });
   assert.equal(mock.thinkings.find((item) => item.checked).value, "low");
@@ -171,4 +181,19 @@ test("saves updated thinkingLevel and applies to active tab", async () => {
   assert.equal(stored.extendedThinking, false);
   assert.equal(mock.tabsSent.length, 1);
   assert.equal(mock.tabsSent[0].msg.settings.thinkingLevel, "low");
+});
+
+test("saves the Argon model and applies it to the active tab", async () => {
+  const mock = createPopupMock({
+    model: "flash-3.8",
+    thinkingLevel: "high"
+  });
+
+  mock.models.forEach((model) => (model.checked = model.value === "argon-4"));
+  mock.panel.trigger("change");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
+  const stored = mock.getStored();
+  assert.equal(stored.model, "argon-4");
+  assert.equal(mock.tabsSent[0].msg.settings.model, "argon-4");
 });
