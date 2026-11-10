@@ -32,6 +32,12 @@
       label: "3.1 Pro",
       description: "Advanced math and code",
       menuPrefix: "3.1 Pro"
+    }),
+    Object.freeze({
+      id: "carbon-4",
+      label: "4 Carbon",
+      description: "Advanced reasoning",
+      menuPrefix: "4 Carbon"
     })
   ]);
 
@@ -75,12 +81,40 @@
       .trim();
   }
 
+  function matchesTextPhrase(value, phrase) {
+    const text = normalizeText(value);
+    const normalizedPhrase = normalizeText(phrase);
+    if (!text || !normalizedPhrase) {
+      return false;
+    }
+
+    const escapedPhrase = normalizedPhrase
+      .split(" ")
+      .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("\\s+");
+    const pattern = new RegExp(
+      `(?:^|[^\\p{L}\\p{N}-])${escapedPhrase}(?=$|[^\\p{L}\\p{N}-])`,
+      "iu"
+    );
+    return pattern.test(text);
+  }
+
+  function matchesModelText(value, model) {
+    const target = typeof model === "string" ? getModel(model) : model;
+    return Boolean(target && matchesTextPhrase(value, target.label));
+  }
+
   function inferPickerState(value) {
     const text = normalizeText(value).toLocaleLowerCase("en-US");
     let model = null;
 
     if (text.includes("argon")) {
       model = "argon-4";
+    } else if (
+      matchesModelText(value, getModel("carbon-4")) ||
+      matchesTextPhrase(text, "Carbon")
+    ) {
+      model = "carbon-4";
     } else if (text.includes("flash-lite") || text.includes("3.5 flash")) {
       model = "flash-lite-3.5";
     } else if (text.includes("pro") || text.includes("3.1")) {
@@ -128,10 +162,7 @@
       .filter(({ text, index }) =>
         !options[index]?.isModel &&
         !options[index]?.isSubmenu &&
-        MODEL_OPTIONS.every(
-          (model) =>
-            !text.startsWith(model.menuPrefix.toLocaleLowerCase("en-US"))
-        )
+        MODEL_OPTIONS.every((model) => !matchesModelText(text, model))
       )
       .map(({ index }) => index);
 
@@ -183,6 +214,7 @@
     findThinkingOptions,
     getModel,
     inferPickerState,
+    matchesModelText,
     normalizeSettings,
     normalizeText,
     resolveModelWithFallback

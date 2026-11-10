@@ -25,6 +25,10 @@ test("normalizes valid settings with thinkingLevel", () => {
     { ...core.normalizeSettings({ model: "argon-4", thinkingLevel: "medium" }) },
     { model: "argon-4", thinkingLevel: "medium", extendedThinking: true }
   );
+  assert.deepEqual(
+    { ...core.normalizeSettings({ model: "carbon-4", thinkingLevel: "high" }) },
+    { model: "carbon-4", thinkingLevel: "high", extendedThinking: true }
+  );
 });
 
 test("migrates legacy extendedThinking boolean to thinkingLevel", () => {
@@ -69,6 +73,11 @@ test("infers every Gemini model from picker text", () => {
     "argon-4"
   );
   assert.equal(core.inferPickerState("Argon").model, "argon-4");
+  assert.equal(core.inferPickerState("Carbon").model, "carbon-4");
+  assert.equal(
+    core.inferPickerState("Select a thinking level").model,
+    null
+  );
   assert.equal(
     core.inferPickerState("Open mode picker, currently Flash Extended").model,
     "flash-3.8"
@@ -79,6 +88,16 @@ test("infers every Gemini model from picker text", () => {
     ).model,
     "flash-lite-3.5"
   );
+});
+
+test("matches full model labels across surrounding descriptions", () => {
+  const carbon = core.getModel("carbon-4");
+  assert.equal(core.matchesModelText("Advanced reasoning 4 Carbon", carbon), true);
+  assert.equal(core.matchesModelText("4   Carbon Advanced reasoning", "carbon-4"), true);
+  assert.equal(core.matchesModelText("Advanced reasoning 4 Carbon", "carbon-4"), true);
+  assert.equal(core.matchesModelText("3.1 Prose", core.getModel("pro-3.1")), false);
+  assert.equal(core.matchesModelText("3.8 Flash-Lite", core.getModel("flash-3.8")), false);
+  assert.equal(core.matchesModelText("Thinking level options", carbon), false);
 });
 
 test("does not infer thinking levels from localized picker labels", () => {
@@ -145,6 +164,24 @@ test("finds thinking options independently of language in new 3-option UI", () =
   assert.equal(core.findThinkingOptionIndex(russianOptions, "low"), 3);
   assert.equal(core.findThinkingOptionIndex(russianOptions, "medium"), 4);
   assert.equal(core.findThinkingOptionIndex(russianOptions, "high"), 5);
+});
+
+test("finds model rows when descriptions come before or after model names", () => {
+  const options = [
+    { text: "Fastest answers 3.5 Flash-Lite" },
+    { text: "3.8 Flash All-around help" },
+    { text: "Advanced math and code 3.1 Pro" },
+    { text: "Advanced reasoning 4 Argon" },
+    { text: "4 Carbon Advanced reasoning" },
+    { text: "Низкая Быстро и эффективно", followsSeparator: true },
+    { text: "Средний Сбалансированная глубина" },
+    { text: "Высокая Максимально тщательно" }
+  ];
+
+  assert.deepEqual(JSON.parse(JSON.stringify(core.findThinkingOptions(options))), {
+    kind: "levels", indexes: [5, 6, 7]
+  });
+  assert.equal(core.findThinkingOptionIndex(options, "low"), 5);
 });
 
 test("finds legacy single thinking option when only one option exists", () => {

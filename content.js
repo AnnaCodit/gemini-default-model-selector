@@ -52,8 +52,12 @@
   }
 
   function readPickerState(picker) {
+    const badge = picker.querySelector(".picker-secondary-text");
+    const text = picker.textContent || "";
     return core.inferPickerState(
-      `${picker.getAttribute("aria-label") || ""} ${picker.textContent || ""}`
+      `${picker.getAttribute("aria-label") || ""} ${
+        badge?.textContent ? text.replace(badge.textContent, " ") : text
+      }`
     );
   }
 
@@ -76,25 +80,12 @@
     return null;
   }
 
-  function captureEditorSelection() {
+  function captureEditorFocus() {
     const editor = findPromptEditor();
-    const selection = document.getSelection();
     const activeElement = document.activeElement;
-    const wasFocused = Boolean(
+    return Boolean(
       editor && (activeElement === editor || editor.contains(activeElement))
     );
-
-    if (
-      editor &&
-      selection &&
-      selection.rangeCount > 0 &&
-      (activeElement === editor || editor.contains(activeElement)) &&
-      editor.contains(selection.anchorNode)
-    ) {
-      return { editor, range: selection.getRangeAt(0).cloneRange(), wasFocused };
-    }
-
-    return { editor, range: null, wasFocused };
   }
 
   function placeCaretAtEnd(editor) {
@@ -110,7 +101,7 @@
     selection.addRange(range);
   }
 
-  async function restoreEditorFocus(snapshot, timeoutMs = UI_TIMEOUT_MS) {
+  async function restoreEditorFocus(timeoutMs = UI_TIMEOUT_MS) {
     const editor = await waitFor(findPromptEditor, timeoutMs);
     if (!editor) {
       return false;
@@ -122,22 +113,6 @@
       const caretPosition = editor.value.length;
       editor.setSelectionRange(caretPosition, caretPosition);
       return true;
-    }
-
-    const selection = document.getSelection();
-    if (
-      snapshot?.range &&
-      snapshot.editor === editor &&
-      snapshot.editor.isConnected &&
-      selection
-    ) {
-      try {
-        selection.removeAllRanges();
-        selection.addRange(snapshot.range);
-        return true;
-      } catch {
-        // Gemini мог перерисовать редактор. В этом случае ставим каретку в конец.
-      }
     }
 
     placeCaretAtEnd(editor);
@@ -160,7 +135,7 @@
         candidate.getAttribute("data-test-id") === "gem-mode-menu" ||
         Array.from(candidate.querySelectorAll(MENU_ITEM_SELECTOR)).some((item) =>
           item.hasAttribute("data-mode-id") ||
-          core.MODEL_OPTIONS.some((model) => findMenuItem([item], model.menuPrefix))
+          core.MODEL_OPTIONS.some((model) => findMenuItem([item], model))
         )
       );
       menu = menus.length === 1 ? menus[0] : null;
@@ -198,7 +173,7 @@
   function findThinkingSubmenuTrigger(items = getVisibleMenuItems()) {
     const triggers = items.filter((item) =>
       !item.hasAttribute("data-mode-id") &&
-      !core.MODEL_OPTIONS.some((model) => findMenuItem([item], model.menuPrefix))
+      !core.MODEL_OPTIONS.some((model) => findMenuItem([item], model))
     ).map(getSubmenuTrigger).filter(Boolean);
     return triggers.length === 1 ? triggers[0] : null;
   }
@@ -325,17 +300,38 @@
     }, UI_TIMEOUT_MS);
   }
 
-  function findMenuItem(items, prefix) {
-    const expected = core.normalizeText(prefix).toLocaleLowerCase("en-US");
+  function findMenuItem(items, model) {
+    return items.find((item) => {
+      // В новом меню описание идёт перед моделью, а textContent соседних
+      // элементов может склеиваться без пробела. Проверяем и отдельные подписи.
+      const labels = [item.textContent, item.getAttribute("aria-label"),
+        ...Array.from(item.querySelectorAll(".label, .sublabel, span"))
+          .map((label) => label.textContent)];
+      return labels.some((label) => core.matchesModelText(label, model));
+    }) || null;
+  }
 
-    return (
-      items.find((item) =>
-        core
-          .normalizeText(item.textContent)
-          .toLocaleLowerCase("en-US")
-          .startsWith(expected)
-      ) || null
-    );
+  function isModelOptionEnabled(item) {
+    if (!isControlEnabled(item) || item.hasAttribute("disabled") ||
+        item.querySelector('[aria-disabled="true"], [disabled]')) {
+      return false;
+    }
+    // Заблокированная подпиской модель может оставаться кликабельной,
+    // открывая предложение обновить тариф вместо переключения модели.
+    return !Array.from(item.querySelectorAll(
+      'mat-icon, [data-mat-icon-name], [fonticon]'
+    )).some((icon) => isVisible(icon) && [
+      icon.getAttribute("data-mat-icon-name"), icon.getAttribute("fonticon"),
+      core.normalizeText(icon.textContent)
+    ].some((name) => name === "lock" || name === "lock_outline"));
+  }
+
+  function findModelOption(items, model) {
+    const item = findMenuItem(items, model);
+    if (item) return { item, model };
+    const fallback = core.getModel(model.fallbackId);
+    const fallbackItem = fallback && findMenuItem(items, fallback);
+    return fallbackItem ? { item: fallbackItem, model: fallback } : null;
   }
 
   function readMenuItemSelected(item) {
@@ -406,7 +402,8 @@
   function getThinkingMenuInfo(items) {
     const options = items.map((item) => ({
       text: item.textContent,
-      isModel: item.hasAttribute("data-mode-id"),
+      isModel: item.hasAttribute("data-mode-id") ||
+        core.MODEL_OPTIONS.some((model) => findMenuItem([item], model)),
       isSubmenu: Boolean(getSubmenuTrigger(item)),
       isRadio: item.getAttribute("role") === "menuitemradio" ||
         item.getAttribute("role") === "radio" ||
@@ -523,23 +520,17 @@
       }
 
       const selection = await waitFor(() => {
-        const readyItems = getVisibleMenuItems();
-        let menuItem = findMenuItem(readyItems, model.menuPrefix);
-        let effectiveModel = model;
-        if (!menuItem && model.fallbackId) {
-          const fallback = core.getModel(model.fallbackId);
-          if (fallback) {
-            menuItem = findMenuItem(readyItems, fallback.menuPrefix);
-            effectiveModel = fallback;
-          }
-        }
-        return menuItem && isControlEnabled(menuItem)
-          ? { effectiveModel } : null;
+        const option = findModelOption(getVisibleMenuItems(), model);
+        return option && isModelOptionEnabled(option.item) ? option : null;
       }, UI_TIMEOUT_MS);
       if (!selection) {
+        const unavailable = findModelOption(getVisibleMenuItems(), model);
+        if (unavailable && !isModelOptionEnabled(unavailable.item)) {
+          throw new Error(`${unavailable.model.label} is unavailable for this account. Choose another model.`);
+        }
         throw new Error(`Could not find the ${model.label} model option.`);
       }
-      const { effectiveModel } = selection;
+      const effectiveModel = selection.model;
 
       const thinkingInfo = await openThinkingMenu();
       const thinkingConfirmation = createThinkingConfirmation(thinkingInfo, targetLevel);
@@ -552,10 +543,14 @@
 
       // Открытие подменю может перерисовать пункты родительского меню.
       const menuItem = await waitFor(() => {
-        const item = findMenuItem(getVisibleMenuItems(), effectiveModel.menuPrefix);
-        return isControlEnabled(item) ? item : null;
+        const item = findMenuItem(getVisibleMenuItems(), effectiveModel);
+        return item && isModelOptionEnabled(item) ? item : null;
       }, UI_TIMEOUT_MS);
       if (!menuItem) {
+        const item = findMenuItem(getVisibleMenuItems(), effectiveModel);
+        if (item && !isModelOptionEnabled(item)) {
+          throw new Error(`${effectiveModel.label} is unavailable for this account. Choose another model.`);
+        }
         throw new Error(`Could not find the ${effectiveModel.label} model option.`);
       }
       menuItem.click();
@@ -606,7 +601,7 @@
       return { applied: false, reason: "The Gemini interface is not ready yet." };
     }
 
-    const selectionSnapshot = captureEditorSelection();
+    const editorWasFocused = captureEditorFocus();
     let changed = false;
     let effectiveModelId = targetSettings.model;
     let thinkingConfirmation = null;
@@ -643,11 +638,8 @@
       }
       if (isModeMenuClosed() &&
         (!thinkingConfirmation?.submenu || !isVisible(thinkingConfirmation.submenu)) &&
-        (failed || changed || options.focusComposer || selectionSnapshot.wasFocused)) {
-        await restoreEditorFocus(
-          selectionSnapshot,
-          options.timeoutMs || UI_TIMEOUT_MS
-        );
+        (failed || changed || options.focusComposer || editorWasFocused)) {
+        await restoreEditorFocus(options.timeoutMs || UI_TIMEOUT_MS);
       }
     }
   }
@@ -768,7 +760,7 @@
             return enqueueApply(options);
           }
           if (options.focusComposer) {
-            await restoreEditorFocus(null, options.timeoutMs || UI_TIMEOUT_MS);
+            await restoreEditorFocus(options.timeoutMs || UI_TIMEOUT_MS);
           }
           return result;
         }, () => enqueueApply(options))

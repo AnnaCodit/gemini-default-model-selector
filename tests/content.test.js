@@ -40,7 +40,16 @@ function loadContent(options = {}) {
     "flash-3.8": "3.8 Flash",
     "flash-3.7": "3.7 Flash",
     "pro-3.1": "3.1 Pro",
-    "argon-4": "4 Argon"
+    "argon-4": "4 Argon",
+    "carbon-4": "4 Carbon"
+  };
+  const modelDescriptions = {
+    "flash-lite-3.5": "Quick answers",
+    "flash-3.8": "All-around help",
+    "flash-3.7": "All-around help",
+    "pro-3.1": "Detailed research",
+    "argon-4": "Code & analysis",
+    "carbon-4": "Most complex work"
   };
 
   function setTimer(callback, ms) {
@@ -160,8 +169,60 @@ function loadContent(options = {}) {
     }
   }
   class TextArea extends Element {
-    constructor() { super("textarea", { "aria-label": "prompt" }); this.value = "draft"; }
+    constructor(value = "draft") { super("textarea", { "aria-label": "prompt" }); this.value = value; }
     setSelectionRange(start, end) { this.selection = [start, end]; }
+  }
+  class TextNode {
+    constructor(text) { this.textContent = text; this.parentElement = null; }
+    get isConnected() { return Boolean(this.parentElement?.isConnected); }
+    getClientRects() { return this.isConnected ? [{}] : []; }
+    contains(node) { return node === this; }
+    matches() { return false; }
+    querySelectorAll() { return []; }
+    querySelector() { return null; }
+    getAttribute() { return null; }
+    hasAttribute() { return false; }
+  }
+  class MockRange {
+    setStart(node, offset) { this.startContainer = node; this.startOffset = offset; }
+    setEnd(node, offset) { this.endContainer = node; this.endOffset = offset; }
+    selectNodeContents(node) {
+      const textNode = node.children.find((child) => child instanceof TextNode);
+      this.setStart(node, 0);
+      this.setEnd(textNode || node, textNode ? textNode.textContent.length : node.children.length);
+    }
+    collapse(toStart = false) {
+      if (toStart) this.setEnd(this.startContainer, this.startOffset);
+      else this.setStart(this.endContainer, this.endOffset);
+    }
+    cloneRange() {
+      const clone = new MockRange();
+      clone.setStart(this.startContainer, this.startOffset);
+      clone.setEnd(this.endContainer, this.endOffset);
+      return clone;
+    }
+  }
+  class MockSelection {
+    constructor() { this.ranges = []; }
+    get rangeCount() { return this.ranges.length; }
+    get anchorNode() { return this.ranges[0]?.startContainer || null; }
+    get anchorOffset() { return this.ranges[0]?.startOffset || 0; }
+    getRangeAt(index) { return this.ranges[index]; }
+    removeAllRanges() { this.ranges = []; }
+    addRange(range) { this.ranges = [range]; }
+    collapse(node, offset) {
+      const range = new MockRange();
+      range.setStart(node, offset);
+      range.setEnd(node, offset);
+      this.addRange(range);
+    }
+  }
+  class ContentEditable extends Element {
+    constructor(value = "draft") {
+      super("div", { role: "textbox", contenteditable: "true", "aria-label": "prompt" });
+      this.isContentEditable = true;
+      this.textNode = this.append(new TextNode(value));
+    }
   }
   const document = new Element("document");
   document.documentElement = document;
@@ -171,14 +232,28 @@ function loadContent(options = {}) {
   document.head = document.append(new Element("head"));
   document.createElement = (tag) => new Element(tag);
   for (const css of contentStyles) document.head.append(new Element("style", {}, css));
-  document.getSelection = () => null;
+  const selection = new MockSelection();
+  document.getSelection = () => selection;
+  document.createRange = () => new MockRange();
   document.getElementById = (id) => document.querySelectorAll("*").find((element) => element.attrs.id === id) || null;
   if (options.profileMenu) document.append(new Element("button", { "aria-haspopup": "menu" }, "Profile"));
   const picker = document.append(new Element("button", {
     "aria-haspopup": "true", "aria-expanded": "false", "aria-controls": "mode-menu"
   }));
   picker.classes.add("input-area-switch");
-  const editor = document.append(new TextArea());
+  function createEditor(text = options.editorText || "draft") {
+    return options.editorType === "contenteditable"
+      ? new ContentEditable(text) : new TextArea(text);
+  }
+  let editor = document.append(createEditor());
+  function setEditorCaret(offset) {
+    if (editor instanceof TextArea) {
+      editor.setSelectionRange(offset, offset);
+    } else {
+      selection.collapse(editor.textNode, offset);
+    }
+  }
+  if (options.initialCaret !== undefined) setEditorCaret(options.initialCaret);
   if (options.editorReadyAfter) {
     const blockedBy = options.editorBlockedBy || "disabled";
     if (blockedBy.startsWith("aria-")) editor.attrs[blockedBy] = "true";
@@ -190,6 +265,31 @@ function loadContent(options = {}) {
     }, options.editorReadyAfter);
   }
   document.activeElement = options.editorFocused === false ? null : editor;
+  if (options.editorType === "contenteditable" && options.initialCaret === undefined) {
+    setEditorCaret(editor.textNode.textContent.length);
+  }
+  function typeEditor(text) {
+    if (editor instanceof TextArea) {
+      const offset = editor.selection?.[1] ?? editor.value.length;
+      editor.value = `${editor.value.slice(0, offset)}${text}${editor.value.slice(offset)}`;
+      editor.setSelectionRange(offset + text.length, offset + text.length);
+    } else {
+      const offset = selection.anchorNode === editor.textNode
+        ? selection.anchorOffset : editor.textNode.textContent.length;
+      editor.textNode.textContent = `${editor.textNode.textContent.slice(0, offset)}${text}${editor.textNode.textContent.slice(offset)}`;
+      setEditorCaret(offset + text.length);
+    }
+    notifyObservers();
+  }
+  function rerenderEditor() {
+    const previous = editor;
+    const text = editor instanceof TextArea ? editor.value : editor.textContent;
+    if (document.activeElement === previous) document.activeElement = null;
+    previous.remove();
+    editor = document.append(createEditor(text));
+    if (editor instanceof ContentEditable) setEditorCaret(editor.textNode.textContent.length);
+    notifyObservers();
+  }
 
   function computedStyle(element) {
     const style = { display: element.hidden ? "none" : "block", visibility: "visible", opacity: "1" };
@@ -207,7 +307,8 @@ function loadContent(options = {}) {
   }
 
   function refreshPicker() {
-    picker.text = modelLabels[model];
+    picker.text = options.shortPickerLabels
+      ? modelLabels[model].replace(/^[\d.]+ /, "") : modelLabels[model];
     picker.children = [];
     if (level !== "low" || options.lowBadge) {
       const badge = picker.append(new Element("span", {}, labels[levels.indexOf(level)]));
@@ -252,7 +353,29 @@ function loadContent(options = {}) {
     }));
     if (options.noMenuTestId) delete menu.attrs["data-test-id"];
     for (const id of options.availableModels || ["flash-lite-3.5", "flash-3.8", "pro-3.1", "argon-4"]) {
-      const item = menu.append(new Element("gem-menu-item", { role: "menuitem", "data-mode-id": id }, modelLabels[id]));
+      const item = menu.append(new Element("gem-menu-item", { role: "menuitem",
+        ...(options.noModelIds ? {} : { "data-mode-id": id }) }, options.descriptionFirst ? "" : modelLabels[id]));
+      if (options.descriptionFirst) {
+        item.append(new Element("span", {}, modelDescriptions[id])).classes.add("label");
+        item.append(new Element("span", {}, modelLabels[id])).classes.add("sublabel");
+      }
+      if (options.disabledModel === id) {
+        if (options.modelBlocker === "disabled") {
+          item.disabled = true;
+          item.attrs.disabled = "";
+        } else if (options.modelBlocker === "nested-disabled") {
+          item.append(new Element("button", { disabled: "" }));
+        } else if (options.modelBlocker === "lock-icon") {
+          item.append(new Element("mat-icon", { "data-mat-icon-name": "lock" }));
+        } else if (options.modelBlocker === "lock-text") {
+          item.append(new Element("mat-icon", {}, "lock"));
+        } else if (options.modelBlocker === "lock-fonticon") {
+          item.append(new Element("mat-icon", { fonticon: "lock_outline" }));
+        } else item.attrs["aria-disabled"] = "true";
+        if (options.enableModelAfter) {
+          setTimer(() => { delete item.attrs["aria-disabled"]; notifyObservers(); }, options.enableModelAfter);
+        }
+      }
       markSelected(item, model === id);
       item.onClick = () => {
         recordClick(id);
@@ -425,12 +548,17 @@ function loadContent(options = {}) {
     assert.fail("content script exceeded the timer budget");
   }
   return {
-    clicks, clickTimes, focusTimes, keyboardEvents, errors, editor, picker, document, computedStyle,
+    clicks, clickTimes, focusTimes, keyboardEvents, errors,
+    get editor() { return editor; },
+    picker, document, computedStyle,
     clock: () => now,
     pendingTimers: () => timers.size,
     activeObservers: () => observers.filter((entry) => entry.observing).length,
     notifyObservers,
     schedule: setTimer,
+    setEditorCaret,
+    typeEditor,
+    rerenderEditor,
     state: () => ({ model, level, menuOpen }),
     openings: () => ({ total: menuOpenings, visible: visibleMenuOpenings }),
     async start() { await runUntil(() => initialComplete); },
@@ -462,6 +590,68 @@ test("cold start selects high from Russian medium without a translation dictiona
   assert.equal(page.state().menuOpen, false);
   assert.equal(page.document.activeElement, page.editor);
   assert.equal(page.editor.value, "draft");
+  assert.deepEqual(page.editor.selection, [page.editor.value.length, page.editor.value.length]);
+});
+
+for (const initialCaret of [0, 3]) {
+  test(`contenteditable restores the caret to the end when it started at ${initialCaret}`, async () => {
+    const page = loadContent({ editorType: "contenteditable", editorText: "draft text",
+      initialCaret });
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.equal(page.editor.textContent, "draft text");
+    assert.equal(page.document.activeElement, page.editor);
+    assert.equal(page.document.getSelection().anchorNode, page.editor.textNode);
+    assert.equal(page.document.getSelection().anchorOffset, page.editor.textNode.textContent.length);
+  });
+}
+
+test("contenteditable typing before a model change is preserved and leaves the caret at the end", async () => {
+  const page = loadContent({ editorType: "contenteditable", editorText: "draft text" });
+  await page.start();
+  page.setEditorCaret(2);
+  page.typeEditor(" added");
+  const typedText = page.editor.textContent;
+
+  const result = await page.apply({ model: "argon-4", thinkingLevel: "high" });
+
+  assert.equal(result.ok, true);
+  assert.equal(page.editor.textContent, typedText);
+  assert.equal(page.document.activeElement, page.editor);
+  assert.equal(page.document.getSelection().anchorNode, page.editor.textNode);
+  assert.equal(page.document.getSelection().anchorOffset, typedText.length);
+});
+
+test("contenteditable typing during verification is preserved and moves the caret to the current end", async () => {
+  const page = loadContent({ editorType: "contenteditable", editorText: "draft text",
+    initialCaret: 1, clickDelay: 0 });
+  page.schedule(() => page.typeEditor(" typed while waiting"), 50);
+  await page.start();
+
+  assert.deepEqual(page.errors, []);
+  assert.equal(page.editor.textContent, "d typed while waitingraft text");
+  assert.equal(page.document.activeElement, page.editor);
+  assert.equal(page.document.getSelection().anchorNode, page.editor.textNode);
+  assert.equal(page.document.getSelection().anchorOffset, page.editor.textNode.textContent.length);
+});
+
+test("contenteditable restores focus and caret to the latest editor after it rerenders", async () => {
+  const page = loadContent({ editorType: "contenteditable", editorText: "draft text",
+    initialModel: "pro-3.1", initialLevel: "low", modelClickDelay: 100,
+    stored: { model: "flash-3.8", thinkingLevel: "high" } });
+  const originalEditor = page.editor;
+  page.schedule(() => {
+    page.typeEditor(" + current text");
+    page.rerenderEditor();
+  }, 50);
+  await page.start();
+
+  assert.deepEqual(page.errors, []);
+  assert.notEqual(page.editor, originalEditor);
+  assert.equal(page.editor.textContent, "draft text + current text");
+  assert.equal(page.document.activeElement, page.editor);
+  assert.equal(page.document.getSelection().anchorNode, page.editor.textNode);
+  assert.equal(page.document.getSelection().anchorOffset, page.editor.textNode.textContent.length);
 });
 
 test("startup changes the level with one visible opening and leaves manual opening visible", async () => {
@@ -1109,4 +1299,94 @@ test("waits for an independently closing submenu before restoring focus", async 
   const focused = page.focusTimes.find((entry) => entry.target === "TEXTAREA");
   assert(focused.time - chosen.time >= 540);
   assert.equal(page.document.querySelector('#thinking-menu'), null);
+});
+
+const currentModels = ["flash-lite-3.5", "flash-3.8", "pro-3.1", "argon-4", "carbon-4"];
+
+for (const target of currentModels) {
+  test(`selects ${target} in the five-model menu with descriptions before model names`, async () => {
+    const page = loadContent({ descriptionFirst: true, noModelIds: true, noControls: true,
+      noMenuTestId: true, unrelatedMenu: true, nestedThinking: true, shortPickerLabels: true,
+      availableModels: currentModels, initialModel: target === "pro-3.1" ? "argon-4" : "pro-3.1",
+      initialLevel: "medium", stored: { model: target, thinkingLevel: "medium" } });
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.deepEqual(page.state(), { model: target, level: "medium", menuOpen: false });
+    assert.deepEqual(page.clicks, ["picker", "thinking-submenu", target]);
+    assert.deepEqual(page.openings(), { total: 1, visible: 1 });
+    assert.equal(page.editor.value, "draft");
+  });
+}
+
+test("a locked Carbon row does not interfere with the current model's thinking options", async () => {
+  const page = loadContent({ descriptionFirst: true, noModelIds: true, nestedThinking: true,
+    availableModels: currentModels, disabledModel: "carbon-4", modelBlocker: "lock-icon" });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.state(), { model: "flash-3.8", level: "high", menuOpen: false });
+  assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "high"]);
+});
+
+for (const modelBlocker of ["aria-disabled", "disabled", "nested-disabled", "lock-icon", "lock-text", "lock-fonticon"]) {
+  test(`a Carbon model blocked by ${modelBlocker} is never clicked and reports account availability`, async () => {
+    const page = loadContent({ descriptionFirst: true, noModelIds: true, nestedThinking: true,
+      availableModels: currentModels, disabledModel: "carbon-4", modelBlocker, initialLevel: "medium" });
+    const request = page.send({ model: "carbon-4", thinkingLevel: "high" });
+    await page.runUntil(request.done);
+    assert.equal(request.response().ok, false);
+    assert.match(request.response().error, /4 Carbon is unavailable for this account/);
+    assert.deepEqual(page.state(), { model: "flash-3.8", level: "medium", menuOpen: false });
+    assert.deepEqual(page.clicks, ["picker"]);
+    assert.equal(page.document.activeElement, page.editor);
+    assert.equal(page.pendingTimers(), 0);
+    assert.equal(page.activeObservers(), 0);
+  });
+}
+
+test("a locked primary model does not silently switch to its older fallback", async () => {
+  const page = loadContent({ availableModels: ["flash-3.8", "flash-3.7", "pro-3.1"],
+    initialModel: "pro-3.1", disabledModel: "flash-3.8", modelBlocker: "lock-icon" });
+  await page.start();
+  assert(page.errors.some((message) => message.includes("3.8 Flash is unavailable")));
+  assert.deepEqual(page.clicks, ["picker"]);
+  assert.equal(page.state().model, "pro-3.1");
+});
+
+test("waits for a temporarily disabled model before selecting it", async () => {
+  const page = loadContent({ descriptionFirst: true, nestedThinking: true, availableModels: currentModels,
+    initialLevel: "high", disabledModel: "carbon-4", enableModelAfter: 120,
+    stored: { model: "carbon-4", thinkingLevel: "high" } });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.state(), { model: "carbon-4", level: "high", menuOpen: false });
+  assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "carbon-4"]);
+});
+
+test("a five-model inline thinking menu excludes all model rows without model ids", async () => {
+  const page = loadContent({ descriptionFirst: true, noModelIds: true, availableModels: currentModels });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.state(), { model: "flash-3.8", level: "high", menuOpen: false });
+  assert.deepEqual(page.clicks, ["picker", "high"]);
+});
+
+test("the new row layout still falls back to Flash 3.7 during rollout", async () => {
+  const page = loadContent({ descriptionFirst: true, noModelIds: true, noControls: true, noMenuTestId: true,
+    availableModels: ["flash-lite-3.5", "flash-3.7", "pro-3.1"], nestedThinking: true,
+    initialModel: "pro-3.1", initialLevel: "medium",
+    stored: { model: "flash-3.8", thinkingLevel: "medium" } });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.state(), { model: "flash-3.7", level: "medium", menuOpen: false });
+  assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "flash-3.7"]);
+});
+
+test("Carbon missing from the old menu fails once and keeps the current settings", async () => {
+  const page = loadContent({ legacy: true, initialLevel: "low",
+    stored: { model: "carbon-4", thinkingLevel: "high" } });
+  await page.start();
+  assert(page.errors.some((message) => message.includes("Could not find the 4 Carbon")));
+  assert.deepEqual(page.state(), { model: "flash-3.8", level: "low", menuOpen: false });
+  assert.deepEqual(page.clicks, ["picker"]);
+  assert.equal(page.pendingTimers(), 0);
 });

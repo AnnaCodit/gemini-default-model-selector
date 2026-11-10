@@ -152,6 +152,15 @@ test("loads the Argon model from storage into its popup input", () => {
   assert.equal(models.find((model) => model.value === "argon-4")?.checked, true);
 });
 
+test("loads the Carbon model and preserves the popup model order", () => {
+  const { models } = createPopupMock({ model: "carbon-4" });
+  assert.deepEqual(
+    models.map((model) => model.value),
+    ["flash-lite-3.5", "flash-3.8", "pro-3.1", "argon-4", "carbon-4"]
+  );
+  assert.equal(models.find((model) => model.value === "carbon-4")?.checked, true);
+});
+
 test("migrates a disabled legacy preference when the popup loads", () => {
   const mock = createPopupMock({ extendedThinking: false });
   assert.equal(mock.thinkings.find((item) => item.checked).value, "low");
@@ -196,4 +205,19 @@ test("saves the Argon model and applies it to the active tab", async () => {
   const stored = mock.getStored();
   assert.equal(stored.model, "argon-4");
   assert.equal(mock.tabsSent[0].msg.settings.model, "argon-4");
+});
+
+test("saves the Carbon model and applies it to the active tab", async () => {
+  const mock = createPopupMock({
+    model: "flash-3.8",
+    thinkingLevel: "high"
+  });
+
+  mock.models.forEach((model) => (model.checked = model.value === "carbon-4"));
+  mock.panel.trigger("change");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
+  const stored = mock.getStored();
+  assert.equal(stored.model, "carbon-4");
+  assert.equal(mock.tabsSent[0].msg.settings.model, "carbon-4");
 });

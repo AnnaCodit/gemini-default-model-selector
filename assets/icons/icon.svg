@@ -5,11 +5,11 @@
       <stop offset="0.56" stop-color="#6B5CF6"/>
       <stop offset="1" stop-color="#C458E8"/>
     </linearGradient>
-    <filter id="shadow" x="10" y="12" width="108" height="112" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#34247D" flood-opacity="0.28"/>
+    <filter id="shadow" x="12" y="12" width="104" height="104" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#34247D" flood-opacity="0.28"/>
     </filter>
   </defs>
-  <g filter="url(#shadow)">
+  <g transform="translate(-16 -16) scale(1.25)" filter="url(#shadow)">
     <rect x="16" y="16" width="96" height="96" rx="27" fill="url(#background)"/>
     <rect x="29" y="48" width="70" height="32" rx="16" fill="#FFFFFF" fill-opacity="0.18" stroke="#FFFFFF" stroke-opacity="0.62" stroke-width="2"/>
     <circle cx="43" cy="64" r="5" fill="#FFFFFF" fill-opacity="0.52"/>
