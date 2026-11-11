@@ -105,27 +105,48 @@
   }
 
   function inferPickerState(value) {
-    const text = normalizeText(value).toLocaleLowerCase("en-US");
-    let model = null;
-
-    if (text.includes("argon")) {
-      model = "argon-4";
-    } else if (
-      matchesModelText(value, getModel("carbon-4")) ||
-      matchesTextPhrase(text, "Carbon")
-    ) {
-      model = "carbon-4";
-    } else if (text.includes("flash-lite") || text.includes("3.5 flash")) {
-      model = "flash-lite-3.5";
-    } else if (text.includes("pro") || text.includes("3.1")) {
-      model = "pro-3.1";
-    } else if (text.includes("3.7")) {
-      model = "flash-3.7";
-    } else if (text.includes("flash") || text.includes("3.8")) {
-      model = "flash-3.8";
+    const labelMatches = new Set();
+    const versionMatches = new Map();
+    for (const candidate of MODEL_OPTIONS) {
+      if (matchesModelText(value, candidate)) {
+        labelMatches.add(candidate.id);
+      }
+      const version = candidate.label.split(" ")[0];
+      const ids = versionMatches.get(version) || [];
+      ids.push(candidate.id);
+      versionMatches.set(version, ids);
+    }
+    for (const [phrase, modelId] of [
+      ["Flash-Lite", "flash-lite-3.5"],
+      ["Pro", "pro-3.1"],
+      ["Argon", "argon-4"],
+      ["Carbon", "carbon-4"]
+    ]) {
+      if (matchesTextPhrase(value, phrase)) {
+        labelMatches.add(modelId);
+      }
     }
 
-    return { model };
+    const matches = new Set(labelMatches);
+    for (const [version, modelIds] of versionMatches) {
+      if (!matchesTextPhrase(value, version)) {
+        continue;
+      }
+      const disambiguatedIds = modelIds.filter((modelId) => labelMatches.has(modelId));
+      for (const modelId of disambiguatedIds.length ? disambiguatedIds : modelIds) {
+        matches.add(modelId);
+      }
+    }
+    const hasExplicitFlashMatch = [...matches].some((modelId) =>
+      modelId.startsWith("flash-")
+    );
+
+    if (!hasExplicitFlashMatch && matchesTextPhrase(value, "Flash")) {
+      matches.add("flash-3.8");
+    }
+
+    return matches.size > 1 ? { model: null, ambiguous: true } :
+      { model: matches.size === 1 ? [...matches][0] : null };
   }
 
   function getModel(modelId) {

@@ -13,6 +13,11 @@
   const MENU_ITEM_SELECTOR =
     '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="radio"], input[type="radio"]';
   const SUBMENU_TRIGGER_SELECTOR = '[aria-haspopup="menu"], [aria-haspopup="true"]';
+  const EDITOR_SELECTOR =
+    '[role="textbox"], .ql-editor, textarea';
+  const COMPOSER_SELECTOR = 'input-container, .input-area-container, [data-test-id="input-area"]';
+  const PICKER_DECORATION_SELECTOR =
+    '.picker-secondary-text, mat-icon, svg, [role="img"], [data-mat-icon-name], [fonticon], .material-icons';
 
   let currentSettings = core.DEFAULT_SETTINGS;
   let rawSettings = {};
@@ -25,6 +30,7 @@
   let initialApplicationSettings = null;
   let initialObserver = null;
   let startupResetWatch = null;
+  let lastModeMenu = null;
 
   function isVisible(element) {
     if (!(element instanceof HTMLElement)) {
@@ -36,16 +42,64 @@
       element.getClientRects().length > 0;
   }
 
+  function getEditorCandidates() {
+    return Array.from(document.querySelectorAll(EDITOR_SELECTOR)).filter((element) =>
+      isVisible(element) && (element instanceof HTMLTextAreaElement || element.isContentEditable)
+    );
+  }
+
+  function chooseModePicker(candidates) {
+    for (const matches of [
+      candidates.filter((button) => button.classList.contains("input-area-switch")),
+      candidates.filter((button) =>
+        (button.getAttribute("aria-label") || "").toLocaleLowerCase("en-US").includes("mode picker")
+      ),
+      candidates.filter((button) => readPickerState(button).model !== null)
+    ]) {
+      if (matches.length) return matches.length === 1 ? matches[0] : null;
+    }
+    return null;
+  }
+
+  function isBroadContainer(element) {
+    return element === document.documentElement || element.matches('body, main, [role="main"]');
+  }
+
   function findModePicker() {
     const candidates = document.querySelectorAll(
       'button[aria-haspopup="true"], button[aria-haspopup="menu"], button.input-area-switch'
     );
 
     const visible = Array.from(candidates).filter(isVisible);
-    return visible.find((button) => button.classList.contains("input-area-switch")) ||
-      visible.find((button) =>
-        (button.getAttribute("aria-label") || "").toLocaleLowerCase("en-US").includes("mode picker")
-      ) || visible.find((button) => readPickerState(button).model !== null) || null;
+    const scopedPickers = new Set();
+    const knownPickers = new Set();
+    let hasKnownComposer = false;
+    let hasScopedCandidates = false;
+    for (const editor of getEditorCandidates()) {
+      const composer = editor.closest(COMPOSER_SELECTOR);
+      if (composer) {
+        hasKnownComposer = true;
+        const picker = chooseModePicker(visible.filter((button) => composer.contains(button)));
+        if (picker) knownPickers.add(picker);
+        continue;
+      }
+      // Ближайший общий контейнер поля и кнопки надёжнее поиска по всей странице.
+      // main/body не считаем композитором: туда попадают сайдбар и другие формы.
+      for (let scope = editor.parentElement; scope && !isBroadContainer(scope); scope = scope.parentElement) {
+        const local = visible.filter((button) => scope.contains(button));
+        if (local.some((button) => chooseModePicker([button]))) {
+          hasScopedCandidates = true;
+          const picker = chooseModePicker(local);
+          if (picker) scopedPickers.add(picker);
+          break;
+        }
+      }
+    }
+    if (hasKnownComposer) return knownPickers.size === 1 ? [...knownPickers][0] : null;
+    if (scopedPickers.size) return scopedPickers.size === 1 ? [...scopedPickers][0] : null;
+    if (hasScopedCandidates) return null;
+    const fallback = visible.filter((button) => chooseModePicker([button]));
+    return fallback.length === 1 ? fallback[0] : null;
   }
 
   function isControlEnabled(element) {
@@ -59,34 +113,32 @@
   }
 
   function readPickerState(picker) {
-    const badge = picker.querySelector(".picker-secondary-text");
-    const text = picker.textContent || "";
+    function readLabel(node) {
+      if (node.nodeType === 3) return node.textContent || "";
+      if (node.matches?.(PICKER_DECORATION_SELECTOR)) return "";
+      return Array.from(node.childNodes || []).map(readLabel).join(" ");
+    }
+    const text = readLabel(picker);
     // При перерисовке aria-label может ещё называть предыдущую модель.
     // Видимая подпись без thinking-бейджа приоритетнее этого запасного источника.
-    const visibleState = core.inferPickerState(
-      badge?.textContent ? text.replace(badge.textContent, " ") : text
-    );
-    return visibleState.model ? visibleState :
+    const visibleState = core.inferPickerState(text);
+    return visibleState.model || visibleState.ambiguous ? visibleState :
       core.inferPickerState(picker.getAttribute("aria-label") || "");
   }
 
   function findPromptEditor() {
-    const selectors = [
-      '[role="textbox"][contenteditable="true"][aria-label*="prompt" i]',
-      '[role="textbox"][contenteditable="true"].ql-editor',
-      'textarea[aria-label*="prompt" i]'
-    ];
-
-    for (const selector of selectors) {
-      const editor = Array.from(document.querySelectorAll(selector)).find((element) =>
-        isVisible(element) && isControlEnabled(element) && !element.readOnly
-      );
-      if (editor) {
-        return editor;
+    const editors = getEditorCandidates().filter((element) =>
+      isControlEnabled(element) && !element.readOnly
+    );
+    const picker = findModePicker();
+    if (picker) {
+      for (let scope = picker.parentElement; scope && !isBroadContainer(scope); scope = scope.parentElement) {
+        const local = editors.filter((editor) => scope.contains(editor));
+        if (local.length) return local.length === 1 ? local[0] : null;
+        if (scope.matches(COMPOSER_SELECTOR)) return null;
       }
     }
-
-    return null;
+    return editors.length === 1 ? editors[0] : null;
   }
 
   function captureEditorFocus() {
@@ -138,10 +190,24 @@
       .map((id) => document.getElementById(id))
       .find((element) => element && isVisible(element));
     if (!menu) {
-      const menus = Array.from(document.querySelectorAll(
+      const visibleMenus = Array.from(document.querySelectorAll(
         '[data-test-id="gem-mode-menu"], [role="menu"]'
-      )).filter(isVisible).filter((candidate) =>
-        candidate.getAttribute("data-test-id") === "gem-mode-menu" ||
+      )).filter(isVisible);
+      const exactMenus = visibleMenus.filter((candidate) =>
+        candidate.getAttribute("data-test-id") === "gem-mode-menu"
+      );
+      if (exactMenus.length) {
+        menu = exactMenus.length === 1 ? exactMenus[0] : null;
+        if (menu) lastModeMenu = menu;
+        return menu;
+      }
+      if (picker.getAttribute("aria-expanded") !== "true") {
+        // После закрытия чужое меню с названием модели не относится к picker.
+        // Проверяем только ранее найденный popover, пока завершается его анимация.
+        if (lastModeMenu && !isVisible(lastModeMenu)) lastModeMenu = null;
+        return lastModeMenu;
+      }
+      const menus = visibleMenus.filter((candidate) =>
         Array.from(candidate.querySelectorAll(MENU_ITEM_SELECTOR)).some((item) =>
           item.hasAttribute("data-mode-id") ||
           core.MODEL_OPTIONS.some((model) => findMenuItem([item], model))
@@ -149,6 +215,7 @@
       );
       menu = menus.length === 1 ? menus[0] : null;
     }
+    if (menu) lastModeMenu = menu;
     return menu;
   }
 

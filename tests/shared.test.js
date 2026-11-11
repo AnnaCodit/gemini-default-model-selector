@@ -74,6 +74,8 @@ test("infers every Gemini model from picker text", () => {
   );
   assert.equal(core.inferPickerState("Argon").model, "argon-4");
   assert.equal(core.inferPickerState("Carbon").model, "carbon-4");
+  assert.equal(core.inferPickerState("Argon 4").model, "argon-4");
+  assert.equal(core.inferPickerState("Carbon 4").model, "carbon-4");
   assert.equal(
     core.inferPickerState("Select a thinking level").model,
     null
@@ -88,6 +90,38 @@ test("infers every Gemini model from picker text", () => {
     ).model,
     "flash-lite-3.5"
   );
+});
+
+test("matches model names and version-only labels conservatively", () => {
+  assert.equal(core.inferPickerState("3.5").model, "flash-lite-3.5");
+  assert.equal(core.inferPickerState("3.8").model, "flash-3.8");
+  assert.equal(core.inferPickerState("3.7").model, "flash-3.7");
+  assert.equal(core.inferPickerState("3.1").model, "pro-3.1");
+  assert.equal(core.inferPickerState("4").model, null);
+  assert.equal(core.inferPickerState("4 Carbon").model, "carbon-4");
+  assert.equal(core.inferPickerState("4 Argon").model, "argon-4");
+
+  for (const text of [
+    "Profile settings",
+    "Prompt suggestions",
+    "Project Astra",
+    "Program options",
+    "Flashlight",
+    "Carbonate",
+    "Argonaut"
+  ]) {
+    assert.equal(core.inferPickerState(text).model, null, text);
+  }
+
+  for (const text of [
+    "3.8 Flash and 3.1 Pro",
+    "Flash Pro",
+    "3.7 Flash and 3.8 Flash",
+    "4 Argon and 4 Carbon"
+  ]) {
+    assert.equal(core.inferPickerState(text).model, null, text);
+    assert.equal(core.inferPickerState(text).ambiguous, true, text);
+  }
 });
 
 test("matches full model labels across surrounding descriptions", () => {

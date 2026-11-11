@@ -90,6 +90,9 @@ function loadContent(options = {}) {
       this.checked = false;
     }
     append(child) { child.parentElement = this; this.children.push(child); return child; }
+    get childNodes() {
+      return [...(this.text ? [{ nodeType: 3, textContent: this.text }] : []), ...this.children];
+    }
     get textContent() { return this.text + this.children.map((child) => child.textContent).join(""); }
     set textContent(value) { this.text = value; this.children = []; }
     get isConnected() { return this === document || Boolean(this.parentElement?.isConnected); }
@@ -176,6 +179,7 @@ function loadContent(options = {}) {
   }
   class TextNode {
     constructor(text) { this.textContent = text; this.parentElement = null; }
+    get nodeType() { return 3; }
     get isConnected() { return Boolean(this.parentElement?.isConnected); }
     getClientRects() { return this.isConnected ? [{}] : []; }
     contains(node) { return node === this; }
@@ -247,10 +251,32 @@ function loadContent(options = {}) {
   document.createRange = () => new MockRange();
   document.getElementById = (id) => document.querySelectorAll("*").find((element) => element.attrs.id === id) || null;
   if (options.profileMenu) document.append(new Element("button", { "aria-haspopup": "menu" }, "Profile"));
-  let picker = document.append(new Element("button", {
+  if (options.outsideModelPicker) {
+    const outside = document.append(new Element("button", { "aria-haspopup": "menu" }, "Pro"));
+    outside.classes.add("input-area-switch");
+    outside.onClick = () => recordClick("unexpected-outside-picker");
+  }
+  if (options.unrelatedEditor) {
+    const outsideForm = options.unrelatedEditorWithPicker ? document.append(new Element("form")) : document;
+    const unrelated = outsideForm.append(new TextArea("unrelated draft"));
+    unrelated.attrs["aria-label"] = "Search chats";
+    if (options.unrelatedEditorWithPicker) {
+      const button = outsideForm.append(new Element("button", { "aria-haspopup": "menu" }, "Pro"));
+      button.classes.add("input-area-switch");
+      button.onClick = () => recordClick("unexpected-other-form-picker");
+    }
+  }
+  const composer = options.composer ? document.append(new Element(options.composerTag || "div")) : document;
+  if (options.composer === "known") composer.classes.add("input-area-container");
+  let picker = composer.append(new Element("button", {
     "aria-haspopup": "true", "aria-expanded": "false", "aria-controls": "mode-menu"
   }));
   picker.classes.add("input-area-switch");
+  if (options.noPickerClass) picker.classes.delete("input-area-switch");
+  if (options.ambiguousPicker) {
+    const other = composer.append(new Element("button", { "aria-haspopup": "menu" }, "Carbon"));
+    other.onClick = () => recordClick("unexpected-ambiguous-picker");
+  }
   if (options.pickerReadyAfter) {
     picker.hidden = true;
     setTimer(() => { picker.hidden = false; notifyObservers(); }, options.pickerReadyAfter);
@@ -261,10 +287,19 @@ function loadContent(options = {}) {
   }
   if (options.pickerAriaLabel) picker.attrs["aria-label"] = options.pickerAriaLabel;
   function createEditor(text = options.editorText || "draft") {
-    return options.editorType === "contenteditable"
+    const result = options.editorType === "contenteditable"
       ? new ContentEditable(text) : new TextArea(text);
+    if (options.editorAriaLabel) result.attrs["aria-label"] = options.editorAriaLabel;
+    if (options.quillWithoutRole) {
+      delete result.attrs.role;
+      result.classes.add("ql-editor");
+    }
+    if (options.editorContentEditable !== undefined) {
+      result.attrs.contenteditable = options.editorContentEditable;
+    }
+    return result;
   }
-  let editor = document.append(createEditor());
+  let editor = composer.append(createEditor());
   function setEditorCaret(offset) {
     if (editor instanceof TextArea) {
       editor.setSelectionRange(offset, offset);
@@ -305,7 +340,7 @@ function loadContent(options = {}) {
     const text = editor instanceof TextArea ? editor.value : editor.textContent;
     if (document.activeElement === previous) document.activeElement = null;
     previous.remove();
-    editor = document.append(createEditor(text));
+    editor = composer.append(createEditor(text));
     if (editor instanceof ContentEditable) setEditorCaret(editor.textNode.textContent.length);
     notifyObservers();
   }
@@ -332,6 +367,9 @@ function loadContent(options = {}) {
     if (level !== "low" || options.lowBadge) {
       const badge = picker.append(new Element("span", {}, labels[levels.indexOf(level)]));
       badge.classes.add("picker-secondary-text");
+    }
+    if (options.pickerIcon) {
+      picker.append(new Element("mat-icon", {}, options.pickerIcon));
     }
     notifyObservers();
   }
@@ -531,6 +569,11 @@ function loadContent(options = {}) {
       item.onClick = () => { clicks.push("unexpected-menu"); };
     }
   }
+  if (options.modelLikeMenu) {
+    const other = document.append(new Element("div", { role: "menu" }));
+    const item = other.append(new Element("button", { role: "menuitem" }, "3.1 Pro"));
+    item.onClick = () => recordClick("unexpected-model-like-menu");
+  }
 
   class ClockDate extends Date { static now() { return now; } }
   class KeyEvent {
@@ -618,7 +661,7 @@ function loadContent(options = {}) {
       picker.classes.add("input-area-switch");
       picker.onClick = oldPicker.onClick;
       oldPicker.remove();
-      document.append(picker);
+      composer.append(picker);
       model = value;
       level = thinkingLevel;
       refreshPicker();
@@ -1677,3 +1720,130 @@ test("sync changes during startup prevent a later watchdog from restoring an obs
   assert.equal(page.clicks.filter((value) => value === "high").length, 1);
   assert.equal(page.documentListenerCount(), 0);
 });
+
+for (const model of ["pro-3.1", "flash-3.8", "argon-4"]) {
+  test(`reads ${model} independently of concatenated icon text and a thinking badge naming another model`, async () => {
+    const page = loadContent({ initialModel: model, initialLevel: "medium", shortPickerLabels: true,
+      labels: ["Low", "Carbon", "High"], pickerIcon: "keyboard_arrow_down",
+      stored: { model, thinkingLevel: "high" } });
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.deepEqual(page.state(), { model, level: "high", menuOpen: false });
+    assert.deepEqual(page.clicks.filter((value) => value !== "picker"), ["high"]);
+  });
+}
+
+for (const composer of ["known", "generic"]) {
+  test(`finds the localized mode picker inside a ${composer} composer before a model-like button outside it`, async () => {
+    const page = loadContent({ composer, noPickerClass: true,
+      pickerAriaLabel: "Выбор модели", outsideModelPicker: true, unrelatedEditor: true,
+      stored: { model: "argon-4", thinkingLevel: "medium" } });
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.deepEqual(page.state(), { model: "argon-4", level: "medium", menuOpen: false });
+    assert(!page.clicks.includes("unexpected-outside-picker"));
+    assert.equal(page.document.activeElement, page.editor);
+    assert.equal(page.editor.value, "draft");
+  });
+}
+
+test("a known composer without an identifiable mode picker cannot fall back to a button outside it", async () => {
+  const page = loadContent({ composer: "known", noPickerClass: true, outsideModelPicker: true });
+  page.picker.text = "Параметры";
+  await page.start();
+  assert.deepEqual(page.clicks, []);
+  assert(page.errors.some((message) => message.includes("not ready")));
+  assert.equal(page.pendingTimers(), 0);
+});
+
+for (const composer of ["known", "generic"]) {
+  test(`ambiguous mode buttons inside a ${composer} composer never select an outside button`, async () => {
+    const page = loadContent({ composer, noPickerClass: true, ambiguousPicker: true, outsideModelPicker: true });
+    await page.start();
+    assert.deepEqual(page.clicks, []);
+    assert(page.errors.some((message) => message.includes("not ready")));
+    assert.equal(page.pendingTimers(), 0);
+  });
+}
+
+for (const editorType of ["textarea", "contenteditable"]) {
+  test(`restores the localized ${editorType} without relying on Quill or an English label`, async () => {
+    const page = loadContent({ composer: "generic", composerTag: "form", unrelatedEditor: true,
+      editorType, editorAriaLabel: "Введите запрос", initialCaret: 2, editorText: "черновик запроса" });
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.equal(page.document.activeElement, page.editor);
+    if (editorType === "textarea") {
+      assert.equal(page.editor.value, "черновик запроса");
+      assert.deepEqual(page.editor.selection, [16, 16]);
+    } else {
+      assert.equal(page.editor.textContent, "черновик запроса");
+      assert.equal(page.document.getSelection().anchorNode, page.editor.textNode);
+      assert.equal(page.document.getSelection().anchorOffset, page.editor.textContent.length);
+    }
+  });
+}
+
+test("the exact Gemini menu wins over another visible menu containing model names", async () => {
+  const page = loadContent({ noControls: true, modelLikeMenu: true, unrelatedMenu: true });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.state(), { model: "flash-3.8", level: "high", menuOpen: false });
+  assert.deepEqual(page.clicks, ["picker", "high"]);
+});
+
+test("an associated menu without ids or a test marker is still tracked through its closing animation", async () => {
+  const page = loadContent({ noControls: true, noMenuTestId: true, unrelatedMenu: true,
+    menuCloseDelay: 350, clickDelay: 0 });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  const chosen = page.clickTimes.find((entry) => entry.value === "high");
+  const focused = page.focusTimes.find((entry) => entry.target === "TEXTAREA");
+  assert.equal(focused.time - chosen.time, 350 + 200);
+  assert.equal(focused.menuVisible, false);
+  assert.deepEqual(page.clicks, ["picker", "high"]);
+});
+
+test("ambiguous visible model text is not confirmed from a stale aria-label", async () => {
+  const page = loadContent({ pickerAriaLabel: "Mode picker, 3.8 Flash", initialLevel: "high" });
+  page.picker.text = "3.8 Flash Pro";
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert(page.clicks.includes("flash-3.8"));
+});
+
+test("a global picker fallback requires a single candidate instead of trusting a class on a foreign button", async () => {
+  const page = loadContent({ noPickerClass: true, outsideModelPicker: true });
+  await page.start();
+  assert.deepEqual(page.clicks, []);
+  assert(page.errors.some((message) => message.includes("not ready")));
+});
+
+test("a known composer takes precedence over another form with a model-like button", async () => {
+  const page = loadContent({ composer: "known", noPickerClass: true,
+    unrelatedEditor: true, unrelatedEditorWithPicker: true });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.equal(page.state().level, "high");
+  assert.equal(page.document.activeElement, page.editor);
+  assert(!page.clicks.includes("unexpected-other-form-picker"));
+});
+
+test("two unknown forms with plausible mode buttons are treated as ambiguous", async () => {
+  const page = loadContent({ composer: "generic", noPickerClass: true,
+    unrelatedEditor: true, unrelatedEditorWithPicker: true });
+  await page.start();
+  assert.deepEqual(page.clicks, []);
+});
+
+for (const options of [{ quillWithoutRole: true }, { editorContentEditable: "plaintext-only" },
+  { editorContentEditable: "" }]) {
+  test(`supports localized editable variants: ${JSON.stringify(options)}`, async () => {
+    const page = loadContent({ composer: "known", editorType: "contenteditable", ...options,
+      editorAriaLabel: "Введите запрос", unrelatedEditor: true });
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.equal(page.document.activeElement, page.editor);
+    assert.equal(page.editor.textContent, "draft");
+  });
+}
