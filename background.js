@@ -90,4 +90,9 @@ importScripts("shared.js");
       });
     return true;
   });
+
+  chrome.runtime.onUpdateAvailable.addListener(() => {
+    // Apply the downloaded extension update immediately.
+    chrome.runtime.reload();
+  });
 })();

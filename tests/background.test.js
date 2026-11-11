@@ -23,6 +23,9 @@ function loadBackground(stored = { model: "pro-3.1", extendedThinking: false }) 
       }
     },
     runtime: {
+      onUpdateAvailable: {
+        addListener() {}
+      },
       onMessage: {
         addListener(listener) {
           messageListener = listener;
