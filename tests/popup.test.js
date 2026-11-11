@@ -17,10 +17,12 @@ const popupSource = fs.readFileSync(
   "utf8"
 );
 
-function createPopupMock(initialStorage = {}) {
+function createPopupMock(initialStorage = {}, options = {}) {
   let stored = { ...initialStorage };
-  const tabsSent = [];
   const runtimeSent = [];
+  const pendingRuntimeResponses = [];
+  let pendingStorageGet = null;
+  let popupClosed = false;
 
   // Simple DOM simulation
   const elements = {
@@ -55,7 +57,10 @@ function createPopupMock(initialStorage = {}) {
     "#open-gemini": { addEventListener() {} },
     "#open-gemini-shortcut": { textContent: "" },
     "#open-gemini-shortcut-change": { addEventListener() {} },
-    "#status": { textContent: "", dataset: {}, replaceChildren() {} }
+    "#status": {
+      textContent: "", dataset: {}, children: [],
+      replaceChildren(...children) { this.children = children; }
+    }
   };
 
   const models = Array.from(
@@ -78,29 +83,31 @@ function createPopupMock(initialStorage = {}) {
       }
     },
     runtime: {
-      async sendMessage(msg) {
+      sendMessage(msg) {
         runtimeSent.push(msg);
-        return { ok: true };
+        if (options.runtimeMessageError) {
+          return Promise.reject(new Error("background unavailable"));
+        }
+        if (options.deferRuntimeMessages) {
+          return new Promise((resolve) => pendingRuntimeResponses.push(resolve));
+        }
+        return Promise.resolve(options.runtimeResponse || {
+          ok: true, saved: true, applied: true
+        });
       }
     },
     storage: {
       sync: {
         get(keys, cb) {
-          cb(Object.fromEntries(keys.filter((key) => key in stored).map((key) => [key, stored[key]])));
-        },
-        async set(items) {
-          stored = { ...stored, ...items };
+          const snapshot = Object.fromEntries(keys.filter((key) => key in stored)
+            .map((key) => [key, stored[key]]));
+          if (options.deferStorageGet) pendingStorageGet = () => cb(snapshot);
+          else cb(snapshot);
         }
       }
     },
     tabs: {
-      async query() {
-        return [{ id: 101 }];
-      },
-      async sendMessage(tabId, msg) {
-        tabsSent.push({ tabId, msg });
-        return { ok: true, applied: true };
-      }
+      async create(options) { return { id: 102, ...options }; }
     }
   };
 
@@ -133,18 +140,36 @@ function createPopupMock(initialStorage = {}) {
     thinkings,
     panel: elements["#settings-panel"],
     status: elements["#status"],
-    tabsSent
+    runtimeSent,
+    closePopup() { popupClosed = true; },
+    isPopupClosed: () => popupClosed,
+    resolveRuntimeMessage(index, result) {
+      pendingRuntimeResponses[index]?.(result);
+    },
+    finishStorageGet() {
+      pendingStorageGet?.();
+    }
   };
 }
 
-test("loads settings into popup inputs", () => {
-  const { models, thinkings } = createPopupMock({
+async function waitFor(predicate) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (predicate()) return;
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.fail("popup operation did not complete in time");
+}
+
+test("loads settings without saving or applying on popup open", () => {
+  const mock = createPopupMock({
     model: "pro-3.1",
     thinkingLevel: "medium"
   });
 
-  assert.equal(models.find((m) => m.value === "pro-3.1").checked, true);
-  assert.equal(thinkings.find((t) => t.value === "medium").checked, true);
+  assert.equal(mock.models.find((m) => m.value === "pro-3.1").checked, true);
+  assert.equal(mock.thinkings.find((t) => t.value === "medium").checked, true);
+  assert.equal(mock.runtimeSent.length, 0);
+  assert.equal(mock.panel.inert, false);
 });
 
 test("loads the Argon model from storage into its popup input", () => {
@@ -172,7 +197,7 @@ test("loads defaults when storage is empty", () => {
   assert.equal(mock.models.find((item) => item.checked).value, "flash-3.8");
 });
 
-test("saves updated thinkingLevel and applies to active tab", async () => {
+test("sends the selected thinkingLevel to the worker", async () => {
   const mock = createPopupMock({
     model: "flash-3.8",
     thinkingLevel: "high"
@@ -182,14 +207,108 @@ test("saves updated thinkingLevel and applies to active tab", async () => {
   mock.thinkings.forEach((t) => (t.checked = t.value === "low"));
   mock.panel.trigger("change");
 
-  // Wait for debounce timer
-  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(mock.runtimeSent.length, 1);
+  assert.equal(mock.runtimeSent[0].type, "GEMINI_SAVE_SETTINGS");
+  assert.equal(mock.runtimeSent[0].settings.thinkingLevel, "low");
+  await waitFor(() => mock.status.textContent === "Saved");
+});
 
-  const stored = mock.getStored();
-  assert.equal(stored.thinkingLevel, "low");
-  assert.equal(stored.extendedThinking, false);
-  assert.equal(mock.tabsSent.length, 1);
-  assert.equal(mock.tabsSent[0].msg.settings.thinkingLevel, "low");
+for (const target of ["medium", "high"]) {
+  test(`dispatches ${target} to the worker before the popup closes`, () => {
+    const mock = createPopupMock(
+      { model: "flash-3.8", thinkingLevel: "low" },
+      { deferRuntimeMessages: true }
+    );
+    mock.thinkings.forEach((item) => (item.checked = item.value === target));
+    mock.panel.trigger("change");
+    mock.closePopup();
+
+    // The message is issued in the change handler, before popup dismissal can unload it.
+    assert.equal(mock.isPopupClosed(), true);
+    assert.equal(mock.runtimeSent.length, 1);
+    assert.equal(mock.runtimeSent[0].settings.thinkingLevel, target);
+  });
+}
+
+test("captures rapid changes in order and ignores an older worker response", async () => {
+  const mock = createPopupMock(
+    { model: "flash-3.8", thinkingLevel: "low" },
+    { deferRuntimeMessages: true }
+  );
+
+  mock.thinkings.forEach((item) => (item.checked = item.value === "medium"));
+  mock.panel.trigger("change");
+  mock.thinkings.forEach((item) => (item.checked = item.value === "high"));
+  mock.panel.trigger("change");
+
+  assert.deepEqual(
+    mock.runtimeSent.map((message) => message.settings.thinkingLevel),
+    ["medium", "high"]
+  );
+  assert.deepEqual(mock.runtimeSent.map((message) => message.sequence), [1, 2]);
+
+  mock.resolveRuntimeMessage(1, { ok: true, saved: true, applied: true });
+  await waitFor(() => mock.status.textContent === "Saved");
+  mock.resolveRuntimeMessage(0, { ok: false, error: "old request failed" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(mock.status.textContent, "Saved");
+});
+
+test("a late storage read cannot replace a setting changed in the popup", () => {
+  const mock = createPopupMock(
+    { model: "pro-3.1", thinkingLevel: "low" },
+    { deferStorageGet: true, deferRuntimeMessages: true }
+  );
+
+  assert.equal(mock.panel.inert, true);
+  mock.models.forEach((item) => (item.checked = item.value === "argon-4"));
+  mock.thinkings.forEach((item) => (item.checked = item.value === "high"));
+  mock.panel.trigger("change");
+  mock.finishStorageGet();
+
+  assert.equal(mock.panel.inert, false);
+  assert.equal(mock.models.find((item) => item.checked)?.value, "argon-4");
+  assert.equal(mock.thinkings.find((item) => item.checked)?.value, "high");
+  assert.equal(mock.status.textContent, "Saving…");
+  assert.equal(mock.runtimeSent[0].settings.model, "argon-4");
+  mock.resolveRuntimeMessage(0, { ok: true, saved: true, applied: true });
+});
+
+test("shows a clear status when the worker reports a storage error", async () => {
+  const mock = createPopupMock({}, {
+    runtimeResponse: { ok: false, saved: false, error: "Could not save the settings." }
+  });
+  mock.thinkings.forEach((item) => (item.checked = item.value === "medium"));
+  mock.panel.trigger("change");
+
+  await waitFor(() => mock.status.textContent === "Could not save the settings.");
+  assert.equal(mock.status.dataset.kind, "error");
+});
+
+test("shows a clear status when the worker message cannot be sent", async () => {
+  const mock = createPopupMock({}, { runtimeMessageError: true });
+  mock.thinkings.forEach((item) => (item.checked = item.value === "high"));
+  mock.panel.trigger("change");
+
+  await waitFor(() => mock.status.textContent === "Could not save the settings. Try reopening the extension.");
+  assert.equal(mock.status.dataset.kind, "error");
+});
+
+test("preserves the Gemini link status returned by the worker", async () => {
+  const mock = createPopupMock({}, {
+    runtimeResponse: {
+      ok: false,
+      saved: true,
+      showGeminiLink: true,
+      error: "Saved. Open or refresh Gemini to apply it."
+    }
+  });
+  mock.thinkings.forEach((item) => (item.checked = item.value === "high"));
+  mock.panel.trigger("change");
+
+  await waitFor(() => mock.status.children.length === 3);
+  assert.equal(mock.status.children[1].textContent, "Gemini");
+  assert.equal(mock.status.dataset.kind, "success");
 });
 
 test("saves the Argon model and applies it to the active tab", async () => {
@@ -200,11 +319,9 @@ test("saves the Argon model and applies it to the active tab", async () => {
 
   mock.models.forEach((model) => (model.checked = model.value === "argon-4"));
   mock.panel.trigger("change");
-  await new Promise((resolve) => setTimeout(resolve, 200));
+  await waitFor(() => mock.status.textContent === "Saved");
 
-  const stored = mock.getStored();
-  assert.equal(stored.model, "argon-4");
-  assert.equal(mock.tabsSent[0].msg.settings.model, "argon-4");
+  assert.equal(mock.runtimeSent[0].settings.model, "argon-4");
 });
 
 test("saves the Carbon model and applies it to the active tab", async () => {
@@ -215,9 +332,7 @@ test("saves the Carbon model and applies it to the active tab", async () => {
 
   mock.models.forEach((model) => (model.checked = model.value === "carbon-4"));
   mock.panel.trigger("change");
-  await new Promise((resolve) => setTimeout(resolve, 200));
+  await waitFor(() => mock.status.textContent === "Saved");
 
-  const stored = mock.getStored();
-  assert.equal(stored.model, "carbon-4");
-  assert.equal(mock.tabsSent[0].msg.settings.model, "carbon-4");
+  assert.equal(mock.runtimeSent[0].settings.model, "carbon-4");
 });

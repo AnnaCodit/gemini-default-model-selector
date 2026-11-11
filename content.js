@@ -6,6 +6,7 @@
   const RETRY_DELAY_MS = 150;
   const UI_TIMEOUT_MS = 3500;
   const COLD_START_UI_TIMEOUT_MS = 30_000;
+  const STARTUP_RESET_WINDOW_MS = 5000;
   const STATE_STABLE_MS = 200;
   const STATE_POLL_MS = 50;
   const MAX_INTERACTION_ATTEMPTS = 2;
@@ -16,12 +17,14 @@
   let currentSettings = core.DEFAULT_SETTINGS;
   let rawSettings = {};
   let applyQueue = Promise.resolve();
+  let latestApplyId = 0;
   let scheduledTimer = null;
   let initialApplicationComplete = false;
   let initialApplicationInProgress = false;
   let initialApplicationRequest = null;
   let initialApplicationSettings = null;
   let initialObserver = null;
+  let startupResetWatch = null;
 
   function isVisible(element) {
     if (!(element instanceof HTMLElement)) {
@@ -51,14 +54,20 @@
       element.getAttribute("aria-busy") !== "true");
   }
 
+  function ensureApplicationActive(isCancelled) {
+    if (isCancelled?.()) throw new Error("Startup recovery was cancelled by user interaction.");
+  }
+
   function readPickerState(picker) {
     const badge = picker.querySelector(".picker-secondary-text");
     const text = picker.textContent || "";
-    return core.inferPickerState(
-      `${picker.getAttribute("aria-label") || ""} ${
-        badge?.textContent ? text.replace(badge.textContent, " ") : text
-      }`
+    // При перерисовке aria-label может ещё называть предыдущую модель.
+    // Видимая подпись без thinking-бейджа приоритетнее этого запасного источника.
+    const visibleState = core.inferPickerState(
+      badge?.textContent ? text.replace(badge.textContent, " ") : text
     );
+    return visibleState.model ? visibleState :
+      core.inferPickerState(picker.getAttribute("aria-label") || "");
   }
 
   function findPromptEditor() {
@@ -101,9 +110,9 @@
     selection.addRange(range);
   }
 
-  async function restoreEditorFocus(timeoutMs = UI_TIMEOUT_MS) {
-    const editor = await waitFor(findPromptEditor, timeoutMs);
-    if (!editor) {
+  async function restoreEditorFocus(timeoutMs = UI_TIMEOUT_MS, isCancelled) {
+    const editor = await waitFor(findPromptEditor, timeoutMs, 0, isCancelled);
+    if (!editor || isCancelled?.()) {
       return false;
     }
 
@@ -200,15 +209,16 @@
     return getThinkingMenuInfo(submenu ? getMenuItems(submenu) : items);
   }
 
-  async function openThinkingMenu() {
-    if (!await openModeMenu()) return null;
+  async function openThinkingMenu(timeoutMs = UI_TIMEOUT_MS, isCancelled) {
+    if (!await openModeMenu(timeoutMs, isCancelled)) return null;
     const ready = await waitFor(() => {
       const items = getVisibleMenuItems();
       const trigger = findThinkingSubmenuTrigger(items);
       if (trigger) return isControlEnabled(trigger) ? { trigger } : null;
       return readThinkingMenuState(getThinkingMenuInfo(items)) ? {} : null;
-    }, UI_TIMEOUT_MS);
+    }, timeoutMs, 0, isCancelled);
     if (!ready) return null;
+    ensureApplicationActive(isCancelled);
     if (ready.trigger && !findThinkingSubmenu(ready.trigger)) {
       ready.trigger.click();
       if (!findThinkingSubmenu(ready.trigger) && ready.trigger.getAttribute("aria-expanded") !== "true") {
@@ -220,10 +230,10 @@
     return waitFor(() => {
       const info = getVisibleThinkingMenuInfo();
       return readThinkingMenuState(info) ? info : null;
-    }, UI_TIMEOUT_MS);
+    }, timeoutMs, 0, isCancelled);
   }
 
-  function waitFor(getValue, timeoutMs, stableMs = 0) {
+  function waitFor(getValue, timeoutMs, stableMs = 0, isCancelled) {
     return new Promise((resolve, reject) => {
       let finished = false;
       let matchingSince = null;
@@ -245,6 +255,10 @@
 
       function check() {
         if (finished) return;
+        if (isCancelled?.()) {
+          finish(null);
+          return;
+        }
         let value;
         try {
           value = getValue();
@@ -278,14 +292,15 @@
     });
   }
 
-  async function openModeMenu() {
+  async function openModeMenu(timeoutMs = UI_TIMEOUT_MS, isCancelled) {
     const picker = await waitFor(() => {
       const candidate = findModePicker();
       return isControlEnabled(candidate) ? candidate : null;
-    }, UI_TIMEOUT_MS);
+    }, timeoutMs, 0, isCancelled);
     if (!picker) {
       return null;
     }
+    ensureApplicationActive(isCancelled);
 
     if (picker.getAttribute("aria-expanded") !== "true") {
       picker.click();
@@ -297,7 +312,7 @@
         items.length
         ? items
         : null;
-    }, UI_TIMEOUT_MS);
+    }, timeoutMs, 0, isCancelled);
   }
 
   function findMenuItem(items, model) {
@@ -360,7 +375,8 @@
       : null;
   }
 
-  async function closeModeMenu(previousSubmenu = null) {
+  async function closeModeMenu(previousSubmenu = null, isCancelled) {
+    if (isCancelled?.()) return;
     const picker = findModePicker();
     if (!picker) {
       return;
@@ -375,10 +391,13 @@
         key: "Escape", code: "Escape", keyCode: 27, which: 27,
         bubbles: true, cancelable: true
       }));
-      if (!await waitFor(() => !isVisible(submenu), UI_TIMEOUT_MS)) {
+      const closed = await waitFor(() => !isVisible(submenu), UI_TIMEOUT_MS, 0, isCancelled);
+      if (isCancelled?.()) return;
+      if (!closed) {
         throw new Error("Gemini did not close the thinking submenu.");
       }
     }
+    if (isCancelled?.()) return;
     const currentPicker = findModePicker() || picker;
     if (currentPicker.getAttribute("aria-expanded") === "true") {
       // Повторный click() по кнопке не гарантирует закрытие popover Gemini.
@@ -388,7 +407,9 @@
         bubbles: true, cancelable: true
       }));
     }
-    if (!await waitFor(() => isModeMenuClosed(menu), UI_TIMEOUT_MS)) {
+    const closed = await waitFor(() => isModeMenuClosed(menu), UI_TIMEOUT_MS, 0, isCancelled);
+    if (isCancelled?.()) return;
+    if (!closed) {
       throw new Error("Gemini did not close the mode menu.");
     }
   }
@@ -490,22 +511,23 @@
       Boolean(confirmation.targetLabel && badge === confirmation.targetLabel);
   }
 
-  function waitForStableSettings(confirmation, modelId) {
+  function waitForStableSettings(confirmation, modelId, timeoutMs, isCancelled) {
     return waitFor(() => {
       const picker = findModePicker();
       return isControlEnabled(picker) && readPickerState(picker).model === modelId &&
         isModeMenuClosed() && (!confirmation?.submenu || !isVisible(confirmation.submenu)) &&
         matchesThinkingConfirmation(confirmation);
-    }, UI_TIMEOUT_MS, STATE_STABLE_MS);
+    }, timeoutMs, STATE_STABLE_MS, isCancelled);
   }
 
-  async function selectModel(modelId, targetLevel) {
+  async function selectModel(modelId, targetLevel, timeoutMs = UI_TIMEOUT_MS, isCancelled) {
     const model = core.getModel(modelId);
     if (!model) {
       throw new Error(`Unknown model: ${modelId}`);
     }
 
     for (let attempt = 0; attempt < MAX_INTERACTION_ATTEMPTS; attempt += 1) {
+      ensureApplicationActive(isCancelled);
       const pickerBefore = findModePicker();
       const currentModel = pickerBefore
         ? readPickerState(pickerBefore).model
@@ -514,7 +536,7 @@
         return { modelId, changed: false };
       }
 
-      const items = await openModeMenu();
+      const items = await openModeMenu(timeoutMs, isCancelled);
       if (!items) {
         continue;
       }
@@ -522,7 +544,7 @@
       const selection = await waitFor(() => {
         const option = findModelOption(getVisibleMenuItems(), model);
         return option && isModelOptionEnabled(option.item) ? option : null;
-      }, UI_TIMEOUT_MS);
+      }, timeoutMs, 0, isCancelled);
       if (!selection) {
         const unavailable = findModelOption(getVisibleMenuItems(), model);
         if (unavailable && !isModelOptionEnabled(unavailable.item)) {
@@ -532,20 +554,18 @@
       }
       const effectiveModel = selection.model;
 
-      const thinkingInfo = await openThinkingMenu();
-      const thinkingConfirmation = createThinkingConfirmation(thinkingInfo, targetLevel);
-      if (!thinkingConfirmation) {
-        throw new Error("The thinking levels could not be verified.");
-      }
+      // Если уровни уже видны, их подписи помогают избежать лишнего открытия.
+      // Их наличие у старой модели не должно блокировать выбор новой модели.
+      const thinkingConfirmation = createThinkingConfirmation(getVisibleThinkingMenuInfo(), targetLevel);
       if (currentModel === effectiveModel.id) {
         return { modelId: effectiveModel.id, changed: false, thinkingConfirmation };
       }
 
-      // Открытие подменю может перерисовать пункты родительского меню.
+      // Ожидание доступности может сопровождаться перерисовкой пунктов меню.
       const menuItem = await waitFor(() => {
         const item = findMenuItem(getVisibleMenuItems(), effectiveModel);
         return item && isModelOptionEnabled(item) ? item : null;
-      }, UI_TIMEOUT_MS);
+      }, timeoutMs, 0, isCancelled);
       if (!menuItem) {
         const item = findMenuItem(getVisibleMenuItems(), effectiveModel);
         if (item && !isModelOptionEnabled(item)) {
@@ -553,15 +573,17 @@
         }
         throw new Error(`Could not find the ${effectiveModel.label} model option.`);
       }
+      ensureApplicationActive(isCancelled);
       menuItem.click();
 
       const applied = await waitFor(() => {
         const picker = findModePicker();
         return isControlEnabled(picker) && readPickerState(picker).model === effectiveModel.id;
-      }, UI_TIMEOUT_MS);
+      }, timeoutMs, 0, isCancelled);
 
       if (applied) {
-        await closeModeMenu(thinkingConfirmation.submenu);
+        ensureApplicationActive(isCancelled);
+        await closeModeMenu(thinkingConfirmation?.submenu, isCancelled);
         return { modelId: effectiveModel.id, changed: true, thinkingConfirmation };
       }
     }
@@ -569,8 +591,8 @@
     throw new Error(`Gemini did not confirm the ${model.label} model.`);
   }
 
-  async function setThinkingLevel(targetLevel) {
-    if (!await openThinkingMenu()) {
+  async function setThinkingLevel(targetLevel, timeoutMs = UI_TIMEOUT_MS, isCancelled) {
+    if (!await openThinkingMenu(timeoutMs, isCancelled)) {
       throw new Error("The requested thinking level is not available or could not be verified.");
     }
     const ready = await waitFor(() => {
@@ -583,20 +605,28 @@
       return selected || (isControlEnabled(targetItem) &&
         (confirmation.kind === "legacy" || confirmation.targetLabel))
         ? { confirmation, targetItem, selected } : null;
-    }, UI_TIMEOUT_MS);
+    }, timeoutMs, 0, isCancelled);
     if (!ready) {
       throw new Error("The requested thinking level is not available or could not be verified.");
     }
+    ensureApplicationActive(isCancelled);
     if (!ready.selected) ready.targetItem.click();
     return { changed: !ready.selected, confirmation: ready.confirmation };
   }
 
   async function applySettings(options = {}) {
+    if (options.isCancelled?.()) {
+      return { applied: false, cancelled: true, reason: "Startup recovery was cancelled by user interaction." };
+    }
     const targetSettings = options.settings || currentSettings;
+    const timeoutMs = options.timeoutMs || UI_TIMEOUT_MS;
     const picker = await waitFor(
       findModePicker,
-      options.timeoutMs || UI_TIMEOUT_MS
+      timeoutMs, 0, options.isCancelled
     );
+    if (options.isCancelled?.()) {
+      return { applied: false, cancelled: true, reason: "Startup recovery was cancelled by user interaction." };
+    }
     if (!picker) {
       return { applied: false, reason: "The Gemini interface is not ready yet." };
     }
@@ -610,9 +640,10 @@
     try {
       for (let attempt = 0; attempt < MAX_INTERACTION_ATTEMPTS; attempt += 1) {
         const currentPicker = findModePicker();
+        ensureApplicationActive(options.isCancelled);
         if (!currentPicker || readPickerState(currentPicker).model !== effectiveModelId) {
           const selectionResult = await selectModel(
-            targetSettings.model, targetSettings.thinkingLevel
+            targetSettings.model, targetSettings.thinkingLevel, timeoutMs, options.isCancelled
           );
           effectiveModelId = selectionResult.modelId;
           changed ||= selectionResult.changed;
@@ -620,36 +651,125 @@
         }
 
         if (!matchesThinkingConfirmation(thinkingConfirmation)) {
-          const thinkingResult = await setThinkingLevel(targetSettings.thinkingLevel);
+          const thinkingResult = await setThinkingLevel(
+            targetSettings.thinkingLevel, timeoutMs, options.isCancelled
+          );
           changed ||= thinkingResult.changed;
           thinkingConfirmation = thinkingResult.confirmation;
         }
-        await closeModeMenu(thinkingConfirmation?.submenu);
-        if (await waitForStableSettings(thinkingConfirmation, effectiveModelId)) {
+        ensureApplicationActive(options.isCancelled);
+        await closeModeMenu(thinkingConfirmation?.submenu, options.isCancelled);
+        if (await waitForStableSettings(thinkingConfirmation, effectiveModelId, timeoutMs, options.isCancelled)) {
           failed = false;
+          if (options.initialApplication && options.applyId === latestApplyId) {
+            watchForStartupReset(targetSettings, thinkingConfirmation, effectiveModelId);
+          }
           return { applied: true, changed };
         }
       }
       throw new Error("Gemini did not confirm the final model settings.");
+    } catch (error) {
+      if (options.isCancelled?.()) return { applied: false, cancelled: true, reason: error.message };
+      throw error;
     } finally {
-      if (findModePicker()?.getAttribute("aria-expanded") === "true" ||
-          (thinkingConfirmation?.submenu && isVisible(thinkingConfirmation.submenu))) {
-        await closeModeMenu(thinkingConfirmation?.submenu);
+      if (!options.isCancelled?.() && (findModePicker()?.getAttribute("aria-expanded") === "true" ||
+          (thinkingConfirmation?.submenu && isVisible(thinkingConfirmation.submenu)))) {
+        await closeModeMenu(thinkingConfirmation?.submenu, options.isCancelled);
       }
-      if (isModeMenuClosed() &&
+      if (!options.isCancelled?.() && isModeMenuClosed() &&
         (!thinkingConfirmation?.submenu || !isVisible(thinkingConfirmation.submenu)) &&
         (failed || changed || options.focusComposer || editorWasFocused)) {
-        await restoreEditorFocus(options.timeoutMs || UI_TIMEOUT_MS);
+        await restoreEditorFocus(options.timeoutMs || UI_TIMEOUT_MS, options.isCancelled);
       }
     }
   }
 
   function enqueueApply(options = {}) {
     const settings = options.settings || currentSettings;
+    const applyId = ++latestApplyId;
     applyQueue = applyQueue
       .catch(() => undefined)
-      .then(() => applySettings({ ...options, settings }));
+      .then(() => applySettings({ ...options, settings, applyId }));
     return applyQueue;
+  }
+
+  function stopStartupResetWatch() {
+    startupResetWatch?.cancel();
+    startupResetWatch = null;
+  }
+
+  function watchForStartupReset(settings, confirmation, modelId) {
+    stopStartupResetWatch();
+    let cancelled = false;
+    let recovering = false;
+    let mismatchTimer = null;
+    let expiryTimer;
+    const interactionEvents = ["pointerdown", "keydown", "input"];
+    const observer = new MutationObserver(check);
+    const watch = { cancel };
+    startupResetWatch = watch;
+
+    function cleanup() {
+      observer.disconnect();
+      clearTimeout(mismatchTimer);
+      clearTimeout(expiryTimer);
+      for (const type of interactionEvents) {
+        document.removeEventListener(type, onInteraction, true);
+      }
+      if (startupResetWatch === watch) startupResetWatch = null;
+    }
+
+    function cancel() {
+      cancelled = true;
+      cleanup();
+    }
+
+    function onInteraction(event) {
+      // Наши click()/Escape синтетические. Реальный ввод сразу отдаёт
+      // управление пользователю, включая уже поставленное в очередь восстановление.
+      if (event.isTrusted) cancel();
+    }
+
+    function needsRecovery() {
+      const picker = findModePicker();
+      return isControlEnabled(picker) && isModeMenuClosed() &&
+        (readPickerState(picker).model !== modelId || !matchesThinkingConfirmation(confirmation));
+    }
+
+    function check() {
+      if (cancelled || recovering) return;
+      if (!needsRecovery()) {
+        clearTimeout(mismatchTimer);
+        mismatchTimer = null;
+      } else if (mismatchTimer === null) {
+        mismatchTimer = setTimeout(recover, STATE_STABLE_MS);
+      }
+    }
+
+    function recover() {
+      mismatchTimer = null;
+      if (cancelled || !needsRecovery()) return;
+      recovering = true;
+      observer.disconnect();
+      clearTimeout(expiryTimer);
+      // Gemini может закончить загрузку или сбросить thinking уже после
+      // успешной проверки. Разрешаем одно восстановление, без вечного автопереключения.
+      const request = enqueueApply({
+        settings, timeoutMs: COLD_START_UI_TIMEOUT_MS, isCancelled: () => cancelled
+      });
+      if (initialApplicationSettings === settings) initialApplicationRequest = request;
+      request.catch((error) => {
+        console.debug("[Gemini Default Model Selector]", error.message);
+      }).finally(cleanup);
+    }
+
+    observer.observe(document.documentElement, {
+      childList: true, subtree: true, attributes: true, characterData: true
+    });
+    for (const type of interactionEvents) {
+      document.addEventListener(type, onInteraction, true);
+    }
+    expiryTimer = setTimeout(cancel, STARTUP_RESET_WINDOW_MS);
   }
 
   function stopInitialApplication() {
@@ -679,9 +799,16 @@
       scheduledTimer = null;
       initialApplicationInProgress = true;
       initialApplicationSettings = currentSettings;
-      initialApplicationRequest = enqueueApply({ focusComposer: false });
+      initialApplicationRequest = enqueueApply({
+        focusComposer: false, initialApplication: true, timeoutMs: COLD_START_UI_TIMEOUT_MS
+      });
       initialApplicationRequest
-        .then(completeInitialApplication)
+        .then((result) => {
+          stopInitialApplication();
+          if (!result?.applied) {
+            console.debug("[Gemini Default Model Selector]", result?.reason || "The settings were not applied.");
+          }
+        })
         .catch((error) => {
           // Внутри одного применения уже есть повтор клика. Не запускаем
           // бесконечный цикл, который будет открывать меню снова и снова.
@@ -728,6 +855,8 @@
     };
     rawSettings = nextSettings;
     currentSettings = core.normalizeSettings(nextSettings);
+    latestApplyId += 1;
+    stopStartupResetWatch();
     // Синхронизация меняет значение по умолчанию, но не должна повторно
     // переключать уже открытую вкладку. Нужная вкладка получает одну явную
     // команду, а остальные сохраняют ручной выбор пользователя.
@@ -745,6 +874,7 @@
         initialApplicationSettings?.thinkingLevel === currentSettings.thinkingLevel
         ? initialApplicationRequest : null;
       stopInitialApplication();
+      if (!initialRequest) stopStartupResetWatch();
       if (!initialRequest || message.initialApplication === true) {
         initialApplicationRequest = null;
         initialApplicationSettings = null;
@@ -752,10 +882,12 @@
       const options = {
         settings: currentSettings,
         focusComposer: message.focusComposer !== false,
+        initialApplication: message.initialApplication === true,
         timeoutMs: message.waitForUi ? COLD_START_UI_TIMEOUT_MS : undefined
       };
       const request = initialRequest
         ? initialRequest.then(async (result) => {
+          if (result?.cancelled) return result;
           if (!result?.applied) {
             return enqueueApply(options);
           }
@@ -778,11 +910,13 @@
   });
 
   chrome.storage.sync.get(core.STORAGE_KEYS, (storedSettings) => {
-    rawSettings = storedSettings;
-    currentSettings = core.normalizeSettings(storedSettings);
+    // Пока чтение было в полёте, onChanged мог принести более свежие поля,
+    // включая удаление ключа (undefined). Поздний снимок не должен их затирать.
+    rawSettings = { ...storedSettings, ...rawSettings };
     if (initialApplicationComplete) {
       return;
     }
+    currentSettings = core.normalizeSettings(rawSettings);
     watchForInitialPicker();
     scheduleInitialApply();
   });

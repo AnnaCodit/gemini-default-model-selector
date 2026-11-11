@@ -23,6 +23,8 @@ function loadContent(options = {}) {
   let storageListener;
   let observer;
   const observers = [];
+  const documentListeners = new Map();
+  let storageCallback;
   let initialComplete = false;
   let model = options.initialModel || "flash-3.8";
   let level = options.initialLevel || "low";
@@ -226,6 +228,14 @@ function loadContent(options = {}) {
   }
   const document = new Element("document");
   document.documentElement = document;
+  document.addEventListener = (type, listener) => {
+    if (!documentListeners.has(type)) documentListeners.set(type, new Set());
+    documentListeners.get(type).add(listener);
+  };
+  document.removeEventListener = (type, listener) => documentListeners.get(type)?.delete(listener);
+  function interact(type = "pointerdown", isTrusted = true) {
+    for (const listener of documentListeners.get(type) || []) listener({ type, isTrusted });
+  }
   document.hidden = Boolean(options.backgroundTab);
   // Document.hidden describes the tab's visibility; its DOM still has layout.
   document.getClientRects = () => [{}];
@@ -237,10 +247,19 @@ function loadContent(options = {}) {
   document.createRange = () => new MockRange();
   document.getElementById = (id) => document.querySelectorAll("*").find((element) => element.attrs.id === id) || null;
   if (options.profileMenu) document.append(new Element("button", { "aria-haspopup": "menu" }, "Profile"));
-  const picker = document.append(new Element("button", {
+  let picker = document.append(new Element("button", {
     "aria-haspopup": "true", "aria-expanded": "false", "aria-controls": "mode-menu"
   }));
   picker.classes.add("input-area-switch");
+  if (options.pickerReadyAfter) {
+    picker.hidden = true;
+    setTimer(() => { picker.hidden = false; notifyObservers(); }, options.pickerReadyAfter);
+  }
+  if (options.pickerEnabledAfter) {
+    picker.disabled = true;
+    setTimer(() => { picker.disabled = false; notifyObservers(); }, options.pickerEnabledAfter);
+  }
+  if (options.pickerAriaLabel) picker.attrs["aria-label"] = options.pickerAriaLabel;
   function createEditor(text = options.editorText || "draft") {
     return options.editorType === "contenteditable"
       ? new ContentEditable(text) : new TextArea(text);
@@ -384,6 +403,9 @@ function loadContent(options = {}) {
           if (!options.ignoreModelClicks) model = id;
           if (options.resetThinkingOnModelChange) level = "low";
           refreshPicker();
+          if (options.delayedThinkingReset) {
+            setTimer(() => { level = "low"; refreshPicker(); }, options.delayedThinkingReset);
+          }
           if (options.modelDriftAfterClick) {
             setTimer(() => { model = options.initialModel; refreshPicker(); }, options.modelDriftAfterClick);
           }
@@ -393,6 +415,10 @@ function loadContent(options = {}) {
       };
     }
     if (options.separator !== false) menu.append(new Element("mat-divider", { role: "separator" }));
+    if (options.modelsWithoutThinking?.includes(model)) {
+      notifyObservers();
+      return;
+    }
     if (options.nestedThinking) {
       const attributes = { id: "thinking-trigger", role: "menuitem",
         "aria-haspopup": "menu", "aria-expanded": "false" };
@@ -518,7 +544,10 @@ function loadContent(options = {}) {
   const chrome = {
     storage: {
       sync: { get(keys, callback) {
-        callback(Object.fromEntries(keys.filter((key) => key in stored).map((key) => [key, stored[key]])));
+        storageCallback = () => callback(Object.fromEntries(
+          keys.filter((key) => key in stored).map((key) => [key, stored[key]])
+        ));
+        if (!options.deferStorage) storageCallback();
       } },
       onChanged: { addListener(listener) { storageListener = listener; } }
     },
@@ -550,7 +579,8 @@ function loadContent(options = {}) {
   return {
     clicks, clickTimes, focusTimes, keyboardEvents, errors,
     get editor() { return editor; },
-    picker, document, computedStyle,
+    get picker() { return picker; },
+    document, computedStyle,
     clock: () => now,
     pendingTimers: () => timers.size,
     activeObservers: () => observers.filter((entry) => entry.observing).length,
@@ -561,7 +591,9 @@ function loadContent(options = {}) {
     rerenderEditor,
     state: () => ({ model, level, menuOpen }),
     openings: () => ({ total: menuOpenings, visible: visibleMenuOpenings }),
-    async start() { await runUntil(() => initialComplete); },
+    async start() {
+      await runUntil(() => initialComplete && observers.every((entry) => !entry.observing));
+    },
     send(settings, messageOptions = {}) {
       let response;
       assert.equal(messageListener({ type: "GEMINI_DEFAULT_MODEL_APPLY", settings, focusComposer: false,
@@ -575,7 +607,22 @@ function loadContent(options = {}) {
       return request.response();
     },
     changeStorage(changes) { storageListener(changes, "sync"); },
+    finishStorage: () => storageCallback(),
+    interact,
+    documentListenerCount: () => [...documentListeners.values()].reduce((sum, listeners) => sum + listeners.size, 0),
     setLevel(value) { level = value; refreshPicker(); },
+    setModel(value) { model = value; refreshPicker(); },
+    replacePicker(value = model, thinkingLevel = level) {
+      const oldPicker = picker;
+      picker = new Element("button", { ...oldPicker.attrs });
+      picker.classes.add("input-area-switch");
+      picker.onClick = oldPicker.onClick;
+      oldPicker.remove();
+      document.append(picker);
+      model = value;
+      level = thinkingLevel;
+      refreshPicker();
+    },
     setLabels(value) { labels = value; refreshPicker(); },
     runUntil
   };
@@ -904,7 +951,7 @@ test("Escape closes already selected settings when the picker click cannot dismi
   assert.equal(page.keyboardEvents.length, 1);
   assert.equal(closed.key, "Escape");
   assert.equal(closed.time, opened.time);
-  assert.equal(page.clock() - opened.time, 200);
+  assert.equal(page.focusTimes.find((entry) => entry.target === "TEXTAREA").time - opened.time, 200);
   assert.equal(page.state().menuOpen, false);
   assert.equal(page.document.activeElement, page.editor);
 });
@@ -1228,14 +1275,14 @@ for (const submenuLink of ["owns", "labelledby", "nested"]) {
   });
 }
 
-test("selects Argon while preserving thinking with one opening", async () => {
+test("selects Argon before checking its nested thinking options", async () => {
   const page = loadContent({ nestedThinking: true, initialLevel: "medium",
     stored: { model: "argon-4", thinkingLevel: "medium" } });
   await page.start();
   assert.deepEqual(page.errors, []);
   assert.deepEqual(page.state(), { model: "argon-4", level: "medium", menuOpen: false });
-  assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "argon-4"]);
-  assert.deepEqual(page.openings(), { total: 1, visible: 1 });
+  assert.deepEqual(page.clicks, ["picker", "argon-4", "picker", "thinking-submenu"]);
+  assert.deepEqual(page.openings(), { total: 2, visible: 2 });
 });
 
 test("restores nested thinking after Argon resets it", async () => {
@@ -1244,7 +1291,7 @@ test("restores nested thinking after Argon resets it", async () => {
   await page.start();
   assert.deepEqual(page.errors, []);
   assert.deepEqual(page.state(), { model: "argon-4", level: "medium", menuOpen: false });
-  assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "argon-4", "picker", "thinking-submenu", "medium"]);
+  assert.deepEqual(page.clicks, ["picker", "argon-4", "picker", "thinking-submenu", "medium"]);
   assert.deepEqual(page.openings(), { total: 2, visible: 2 });
 });
 
@@ -1312,8 +1359,8 @@ for (const target of currentModels) {
     await page.start();
     assert.deepEqual(page.errors, []);
     assert.deepEqual(page.state(), { model: target, level: "medium", menuOpen: false });
-    assert.deepEqual(page.clicks, ["picker", "thinking-submenu", target]);
-    assert.deepEqual(page.openings(), { total: 1, visible: 1 });
+    assert.deepEqual(page.clicks, ["picker", target, "picker", "thinking-submenu"]);
+    assert.deepEqual(page.openings(), { total: 2, visible: 2 });
     assert.equal(page.editor.value, "draft");
   });
 }
@@ -1359,7 +1406,7 @@ test("waits for a temporarily disabled model before selecting it", async () => {
   await page.start();
   assert.deepEqual(page.errors, []);
   assert.deepEqual(page.state(), { model: "carbon-4", level: "high", menuOpen: false });
-  assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "carbon-4"]);
+  assert.deepEqual(page.clicks, ["picker", "carbon-4", "picker", "thinking-submenu"]);
 });
 
 test("a five-model inline thinking menu excludes all model rows without model ids", async () => {
@@ -1378,7 +1425,7 @@ test("the new row layout still falls back to Flash 3.7 during rollout", async ()
   await page.start();
   assert.deepEqual(page.errors, []);
   assert.deepEqual(page.state(), { model: "flash-3.7", level: "medium", menuOpen: false });
-  assert.deepEqual(page.clicks, ["picker", "thinking-submenu", "flash-3.7"]);
+  assert.deepEqual(page.clicks, ["picker", "flash-3.7", "picker", "thinking-submenu"]);
 });
 
 test("Carbon missing from the old menu fails once and keeps the current settings", async () => {
@@ -1389,4 +1436,244 @@ test("Carbon missing from the old menu fails once and keeps the current settings
   assert.deepEqual(page.state(), { model: "flash-3.8", level: "low", menuOpen: false });
   assert.deepEqual(page.clicks, ["picker"]);
   assert.equal(page.pendingTimers(), 0);
+});
+
+for (const [model, thinkingLevel] of [["argon-4", "medium"], ["flash-3.8", "high"]]) {
+  test(`startup repairs a delayed reset to low for ${model} ${thinkingLevel}`, async () => {
+    const page = loadContent({ initialModel: "pro-3.1", initialLevel: thinkingLevel,
+      nestedThinking: true, delayedThinkingReset: 650, stored: { model, thinkingLevel } });
+    let settled = false;
+    page.schedule(() => { settled = true; }, 1800);
+    await page.runUntil(() => settled);
+    assert.deepEqual(page.errors, []);
+    assert.deepEqual(page.state(), { model, level: thinkingLevel, menuOpen: false });
+    assert.equal(page.clicks.filter((value) => value === thinkingLevel).length, 1);
+    await page.start();
+    assert.equal(page.pendingTimers(), 0);
+    assert.equal(page.documentListenerCount(), 0);
+  });
+}
+
+test("startup repairs a hydration reset even when the preferred model was already selected", async () => {
+  const page = loadContent({ initialLevel: "high" });
+  page.schedule(() => page.setLevel("low"), 900);
+  let settled = false;
+  page.schedule(() => { settled = true; }, 1800);
+  await page.runUntil(() => settled);
+  assert.equal(page.state().level, "high");
+  assert.deepEqual(page.errors, []);
+  await page.start();
+});
+
+for (const eventType of ["pointerdown", "keydown", "input"]) {
+  test(`a trusted ${eventType} stops startup recovery and preserves manual thinking`, async () => {
+    const page = loadContent();
+    await page.runUntil(() => page.focusTimes.some((entry) => entry.target === "TEXTAREA"));
+    page.interact(eventType);
+    page.setLevel("medium");
+    let settled = false;
+    page.schedule(() => { settled = true; }, 1000);
+    await page.runUntil(() => settled);
+    assert.equal(page.state().level, "medium");
+    assert.deepEqual(page.openings(), { total: 1, visible: 1 });
+    assert.equal(page.activeObservers(), 0);
+    assert.equal(page.documentListenerCount(), 0);
+  });
+}
+
+test("synthetic menu events do not disable recovery from a late startup reset", async () => {
+  const page = loadContent();
+  await page.runUntil(() => page.focusTimes.some((entry) => entry.target === "TEXTAREA"));
+  page.interact("keydown", false);
+  page.setLevel("low");
+  let settled = false;
+  page.schedule(() => { settled = true; }, 1000);
+  await page.runUntil(() => settled);
+  assert.equal(page.state().level, "high");
+  await page.start();
+});
+
+test("an explicit preference cancels startup recovery of the previous preference", async () => {
+  const page = loadContent();
+  await page.runUntil(() => page.focusTimes.some((entry) => entry.target === "TEXTAREA"));
+  page.setLevel("low");
+  const result = await page.apply({ model: "argon-4", thinkingLevel: "medium" });
+  assert.equal(result.applied, true);
+  assert.deepEqual(page.state(), { model: "argon-4", level: "medium", menuOpen: false });
+  assert.equal(page.pendingTimers(), 0);
+  assert.equal(page.activeObservers(), 0);
+  assert.equal(page.documentListenerCount(), 0);
+});
+
+test("startup recovery is bounded when Gemini keeps reverting the thinking level", async () => {
+  const page = loadContent({ driftAfterClick: "low", driftDelay: 650 });
+  await page.start();
+  let settled = false;
+  page.schedule(() => { settled = true; }, 1000);
+  await page.runUntil(() => settled);
+  assert.equal(page.state().level, "low");
+  assert.equal(page.clicks.filter((value) => value === "high").length, 2);
+  assert.equal(page.pendingTimers(), 0);
+  assert.equal(page.activeObservers(), 0);
+  assert.equal(page.documentListenerCount(), 0);
+});
+
+for (const delayedUi of [{ menuDelay: 4500 }, { nestedThinking: true, submenuDelay: 4500 },
+  { selectionDelay: 4500 }, { clickDelay: 4500 }]) {
+  test(`cold startup waits for delayed UI: ${JSON.stringify(delayedUi)}`, async () => {
+    const page = loadContent(delayedUi);
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.equal(page.state().level, "high");
+    assert.equal(page.state().menuOpen, false);
+    assert.equal(page.pendingTimers(), 0);
+    assert.equal(page.clicks.filter((value) => value === "high").length, 1);
+  });
+}
+
+test("a slow initial storage snapshot cannot overwrite a newer synced thinking level", async () => {
+  const page = loadContent({ deferStorage: true, stored: { thinkingLevel: "low" } });
+  page.changeStorage({ thinkingLevel: { newValue: "medium" } });
+  page.finishStorage();
+  await page.start();
+  assert.equal(page.state().level, "medium");
+  assert.deepEqual(page.errors, []);
+});
+
+test("deleting a preference during the initial storage read still uses legacy migration", async () => {
+  const page = loadContent({ deferStorage: true,
+    stored: { thinkingLevel: "high", extendedThinking: false } });
+  page.changeStorage({ thinkingLevel: { oldValue: "high" } });
+  page.finishStorage();
+  await page.start();
+  assert.equal(page.state().level, "low");
+});
+
+for (const nestedThinking of [false, true]) {
+  test(`switching models does not require thinking options on the previous model (nested=${nestedThinking})`, async () => {
+    const page = loadContent({ initialModel: "flash-lite-3.5", modelsWithoutThinking: ["flash-lite-3.5"],
+      nestedThinking, stored: { model: "argon-4", thinkingLevel: "medium" } });
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.deepEqual(page.state(), { model: "argon-4", level: "medium", menuOpen: false });
+    assert.deepEqual(page.clicks.filter((value) => !["picker", "thinking-submenu"].includes(value)),
+      ["argon-4", "medium"]);
+    assert(page.clickTimes.find((entry) => entry.value === "argon-4").time < 500);
+  });
+}
+
+for (const [initialModel, storedModel] of [["flash-3.8", "argon-4"], ["argon-4", "flash-3.8"]]) {
+  test(`visible ${initialModel} overrides a stale aria-label naming ${storedModel}`, async () => {
+    const page = loadContent({ initialModel, pickerAriaLabel: `Mode picker, ${storedModel === "argon-4" ? "4 Argon" : "3.8 Flash"}`,
+      stored: { model: storedModel, thinkingLevel: "medium" } });
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.deepEqual(page.state(), { model: storedModel, level: "medium", menuOpen: false });
+    assert(page.clicks.includes(storedModel));
+  });
+}
+
+test("startup repairs late replacement of the model picker and both model settings", async () => {
+  const page = loadContent({ stored: { model: "argon-4", thinkingLevel: "medium" } });
+  page.schedule(() => page.replacePicker("flash-3.8", "low"), 1000);
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.state(), { model: "argon-4", level: "medium", menuOpen: false });
+  assert.equal(page.clicks.filter((value) => value === "argon-4").length, 2);
+});
+
+test("a trusted model selection stops recovery as well as a thinking selection", async () => {
+  const page = loadContent({ stored: { model: "argon-4", thinkingLevel: "medium" } });
+  await page.runUntil(() => page.focusTimes.some((entry) => entry.target === "TEXTAREA"));
+  page.interact();
+  page.setModel("pro-3.1");
+  let settled = false;
+  page.schedule(() => { settled = true; }, 1000);
+  await page.runUntil(() => settled);
+  assert.equal(page.state().model, "pro-3.1");
+  assert.equal(page.clicks.filter((value) => value === "argon-4").length, 1);
+  assert.equal(page.activeObservers(), 0);
+});
+
+for (const delayedUi of [{ pickerReadyAfter: 5000 }, { pickerEnabledAfter: 5000 },
+  { initialModel: "pro-3.1", modelClickDelay: 4500 }]) {
+  test(`cold startup waits for the model interface: ${JSON.stringify(delayedUi)}`, async () => {
+    const page = loadContent(delayedUi);
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.deepEqual(page.state(), { model: "flash-3.8", level: "high", menuOpen: false });
+    assert.equal(page.pendingTimers(), 0);
+    if (delayedUi.modelClickDelay) {
+      assert.equal(page.clicks.filter((value) => value === "flash-3.8").length, 1);
+    }
+  });
+}
+
+test("a slow initial snapshot also preserves a newer synced model", async () => {
+  const page = loadContent({ deferStorage: true, stored: { model: "flash-3.8", thinkingLevel: "low" } });
+  page.changeStorage({ model: { newValue: "argon-4" }, thinkingLevel: { newValue: "medium" } });
+  page.finishStorage();
+  await page.start();
+  assert.deepEqual(page.state(), { model: "argon-4", level: "medium", menuOpen: false });
+  assert.deepEqual(page.errors, []);
+});
+
+test("trusted input during a running recovery prevents its delayed clicks and focus changes", async () => {
+  const page = loadContent({ menuDelay: 300 });
+  await page.runUntil(() => page.focusTimes.some((entry) => entry.target === "TEXTAREA"));
+  page.setLevel("low");
+  await page.runUntil(() => page.clicks.filter((value) => value === "picker").length === 2);
+  const focusCount = page.focusTimes.length;
+  page.interact("input");
+  page.setLevel("medium");
+  await page.start();
+  let settled = false;
+  page.schedule(() => { settled = true; }, 500);
+  await page.runUntil(() => settled);
+  assert.equal(page.state().level, "medium");
+  assert.equal(page.clicks.filter((value) => value === "high").length, 1);
+  assert.equal(page.focusTimes.length, focusCount);
+  assert.equal(page.documentListenerCount(), 0);
+  assert.equal(page.pendingTimers(), 0);
+  assert.deepEqual(page.errors, []);
+});
+
+test("startup gives up cleanly when the picker never appears within its cold-start budget", async () => {
+  const page = loadContent();
+  page.picker.hidden = true;
+  await page.start();
+  assert.equal(page.state().level, "low");
+  assert.deepEqual(page.clicks, []);
+  assert(page.errors.some((message) => message.includes("not ready")));
+  assert.equal(page.pendingTimers(), 0);
+  assert.equal(page.activeObservers(), 0);
+  assert.equal(page.documentListenerCount(), 0);
+});
+
+test("a delayed background startup signal cannot restart a recovery cancelled by manual input", async () => {
+  const page = loadContent({ menuDelay: 300 });
+  await page.runUntil(() => page.focusTimes.some((entry) => entry.target === "TEXTAREA"));
+  page.setLevel("low");
+  await page.runUntil(() => page.clicks.filter((value) => value === "picker").length === 2);
+  page.interact("input");
+  page.setLevel("medium");
+  const request = page.send({ thinkingLevel: "high" }, { initialApplication: true, waitForUi: true });
+  await page.runUntil(request.done);
+  assert.equal(request.response().cancelled, true);
+  assert.equal(page.state().level, "medium");
+  assert.equal(page.clicks.filter((value) => value === "high").length, 1);
+});
+
+test("sync changes during startup prevent a later watchdog from restoring an obsolete preference", async () => {
+  const page = loadContent({ clickDelay: 600 });
+  await page.runUntil(() => page.clicks.includes("high"));
+  page.changeStorage({ model: { newValue: "argon-4" }, thinkingLevel: { newValue: "medium" } });
+  await page.start();
+  page.setLevel("low");
+  let settled = false;
+  page.schedule(() => { settled = true; }, 1000);
+  await page.runUntil(() => settled);
+  assert.equal(page.state().level, "low");
+  assert.equal(page.clicks.filter((value) => value === "high").length, 1);
+  assert.equal(page.documentListenerCount(), 0);
 });

@@ -2,7 +2,7 @@
   "use strict";
 
   const core = globalThis.GeminiDefaultModelCore;
-  const APPLY_MESSAGE = "GEMINI_DEFAULT_MODEL_APPLY";
+  const SAVE_SETTINGS_MESSAGE = "GEMINI_SAVE_SETTINGS";
   const OPEN_GEMINI_MESSAGE = "GEMINI_OPEN_NEW_TAB";
   const OPEN_GEMINI_COMMAND = "open-gemini";
   const settingsPanel = document.querySelector("#settings-panel");
@@ -12,7 +12,9 @@
     "#open-gemini-shortcut-change"
   );
   const status = document.querySelector("#status");
-  let saveTimer = null;
+  let settingsChangeSequence = 0;
+  let settingsChanged = false;
+  settingsPanel.inert = true;
 
   function setStatus(message, kind = "info") {
     status.textContent = message;
@@ -62,10 +64,6 @@
     }
   }
 
-  async function saveSettings(settings) {
-    await chrome.storage.sync.set(settings);
-  }
-
   async function updateShortcutLabel() {
     try {
       const commands = await chrome.commands.getAll();
@@ -80,62 +78,47 @@
     }
   }
 
-  async function applyToCurrentTab(settings, focusComposer) {
-    const [activeTab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true
-    });
-
-    if (!activeTab?.id) {
-      return { ok: false, error: "Saved, but the active tab was not found." };
+  function showSaveResult(result, sequence) {
+    if (result?.stale || sequence !== settingsChangeSequence) {
+      return;
     }
-
-    try {
-      return await chrome.tabs.sendMessage(activeTab.id, {
-        type: APPLY_MESSAGE,
-        settings,
-        focusComposer
-      });
-    } catch {
-      return {
-        ok: false,
-        error: "Saved. Open or refresh Gemini to apply it.",
-        showGeminiLink: true
-      };
-    }
-  }
-
-  async function saveAndApply() {
-    const settings = readForm();
-    await saveSettings(settings);
-    const result = await applyToCurrentTab(settings, true);
-
     if (!result?.ok) {
       if (result?.showGeminiLink) {
         setGeminiLinkStatus();
-        return false;
+        return;
       }
       setStatus(result?.error || "Saved, but not applied yet.", "error");
-      return false;
+      return;
     }
 
     if (!result.applied) {
       setStatus("Saved. Gemini is still loading.", "error");
-      return false;
+      return;
     }
 
     setStatus("Saved", "success");
-    return true;
   }
 
   settingsPanel.addEventListener("change", () => {
-    clearTimeout(saveTimer);
+    const settings = readForm();
+    const sequence = ++settingsChangeSequence;
+    settingsChanged = true;
     setStatus("Saving…");
-    saveTimer = setTimeout(() => {
-      saveAndApply().catch(() => {
-        setStatus("Could not save the settings.", "error");
+    try {
+      Promise.resolve(chrome.runtime.sendMessage({
+        type: SAVE_SETTINGS_MESSAGE,
+        settings,
+        sequence
+      })).then((result) => showSaveResult(result, sequence)).catch(() => {
+        if (sequence === settingsChangeSequence) {
+          setStatus("Could not save the settings. Try reopening the extension.", "error");
+        }
       });
-    }, 120);
+    } catch {
+      if (sequence === settingsChangeSequence) {
+        setStatus("Could not save the settings. Try reopening the extension.", "error");
+      }
+    }
   });
 
   openGeminiButton.addEventListener("click", async () => {
@@ -164,8 +147,13 @@
   });
 
   chrome.storage.sync.get(core.STORAGE_KEYS, (storedSettings) => {
+    if (settingsChanged) {
+      settingsPanel.inert = false;
+      return;
+    }
     const settings = core.normalizeSettings(storedSettings);
     writeForm(settings);
+    settingsPanel.inert = false;
     setStatus("Changes save automatically");
   });
 
