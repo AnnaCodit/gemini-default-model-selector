@@ -23,6 +23,8 @@ function createPopupMock(initialStorage = {}, options = {}) {
   const pendingRuntimeResponses = [];
   let pendingStorageGet = null;
   let popupClosed = false;
+  const permissionQueries = [];
+  const tabCreates = [];
 
   // Simple DOM simulation
   const elements = {
@@ -57,6 +59,12 @@ function createPopupMock(initialStorage = {}, options = {}) {
     "#open-gemini": { addEventListener() {} },
     "#open-gemini-shortcut": { textContent: "" },
     "#open-gemini-shortcut-change": { addEventListener() {} },
+    "#site-access-settings": {
+      listeners: {},
+      addEventListener(type, cb) { this.listeners[type] = cb; },
+      trigger(type) { return this.listeners[type]?.(); }
+    },
+    "#site-access-warning": { hidden: true },
     "#status": {
       textContent: "", dataset: {}, children: [],
       replaceChildren(...children) { this.children = children; }
@@ -83,6 +91,7 @@ function createPopupMock(initialStorage = {}, options = {}) {
       }
     },
     runtime: {
+      id: "test-extension-id",
       sendMessage(msg) {
         runtimeSent.push(msg);
         if (options.runtimeMessageError) {
@@ -96,6 +105,15 @@ function createPopupMock(initialStorage = {}, options = {}) {
         });
       }
     },
+    permissions: {
+      contains(details) {
+        permissionQueries.push(details);
+        if (options.permissionError) {
+          return Promise.reject(new Error("permission state unavailable"));
+        }
+        return Promise.resolve(options.permissionResult ?? true);
+      }
+    },
     storage: {
       sync: {
         get(keys, cb) {
@@ -107,7 +125,10 @@ function createPopupMock(initialStorage = {}, options = {}) {
       }
     },
     tabs: {
-      async create(options) { return { id: 102, ...options }; }
+      async create(options) {
+        tabCreates.push(options);
+        return { id: 102, ...options };
+      }
     }
   };
 
@@ -139,8 +160,12 @@ function createPopupMock(initialStorage = {}, options = {}) {
     models,
     thinkings,
     panel: elements["#settings-panel"],
+    siteAccessWarning: elements["#site-access-warning"],
+    siteAccessSettingsButton: elements["#site-access-settings"],
     status: elements["#status"],
     runtimeSent,
+    permissionQueries,
+    tabCreates,
     closePopup() { popupClosed = true; },
     isPopupClosed: () => popupClosed,
     resolveRuntimeMessage(index, result) {
@@ -170,6 +195,52 @@ test("loads settings without saving or applying on popup open", () => {
   assert.equal(mock.thinkings.find((t) => t.value === "medium").checked, true);
   assert.equal(mock.runtimeSent.length, 0);
   assert.equal(mock.panel.inert, false);
+});
+
+test("shows the Gemini site access warning when permanent access is withheld", async () => {
+  const mock = createPopupMock({}, { permissionResult: false });
+
+  assert.equal(mock.siteAccessWarning.hidden, true);
+  await waitFor(() => !mock.siteAccessWarning.hidden);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(mock.permissionQueries)), [{
+    origins: ["https://gemini.google.com/*"]
+  }]);
+  assert.equal(mock.runtimeSent.length, 0);
+  assert.equal(mock.panel.inert, false);
+});
+
+test("keeps the Gemini site access warning hidden when permanent access is granted", async () => {
+  const mock = createPopupMock({}, { permissionResult: true });
+
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(JSON.parse(JSON.stringify(mock.permissionQueries)), [{
+    origins: ["https://gemini.google.com/*"]
+  }]);
+  assert.equal(mock.siteAccessWarning.hidden, true);
+  assert.equal(mock.runtimeSent.length, 0);
+});
+
+test("keeps the site access warning hidden when permission state is unknown", async () => {
+  const mock = createPopupMock({}, { permissionError: true });
+
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(mock.siteAccessWarning.hidden, true);
+  assert.equal(mock.runtimeSent.length, 0);
+});
+
+test("opens this extension's settings when site access settings is clicked", async () => {
+  const mock = createPopupMock({}, { permissionResult: false });
+
+  mock.siteAccessSettingsButton.trigger("click");
+  await waitFor(() => mock.tabCreates.length === 1);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(mock.tabCreates)), [{
+    url: "chrome://extensions/?id=test-extension-id"
+  }]);
+  assert.equal(mock.runtimeSent.length, 0);
 });
 
 test("loads the Argon model from storage into its popup input", () => {

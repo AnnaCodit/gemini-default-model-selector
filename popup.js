@@ -11,7 +11,10 @@
   const shortcutChangeButton = document.querySelector(
     "#open-gemini-shortcut-change"
   );
+  const siteAccessWarning = document.querySelector("#site-access-warning");
+  const siteAccessSettingsButton = document.querySelector("#site-access-settings");
   const status = document.querySelector("#status");
+  const GEMINI_ORIGIN = "https://gemini.google.com/*";
   let settingsChangeSequence = 0;
   let settingsChanged = false;
   settingsPanel.inert = true;
@@ -75,6 +78,17 @@
         : "(hotkey not set)";
     } catch {
       shortcutLabel.textContent = "(hotkey unavailable)";
+    }
+  }
+
+  async function checkGeminiSiteAccess() {
+    try {
+      const hasGeminiAccess = await chrome.permissions.contains({
+        origins: [GEMINI_ORIGIN]
+      });
+      siteAccessWarning.hidden = hasGeminiAccess;
+    } catch {
+      siteAccessWarning.hidden = true;
     }
   }
 
@@ -146,6 +160,16 @@
     }
   });
 
+  siteAccessSettingsButton.addEventListener("click", async () => {
+    try {
+      await chrome.tabs.create({
+        url: `chrome://extensions/?id=${chrome.runtime.id}`
+      });
+    } catch {
+      setStatus("Could not open extension site access settings.", "error");
+    }
+  });
+
   chrome.storage.sync.get(core.STORAGE_KEYS, (storedSettings) => {
     if (settingsChanged) {
       settingsPanel.inert = false;
@@ -157,5 +181,6 @@
     setStatus("Changes save automatically");
   });
 
+  checkGeminiSiteAccess();
   updateShortcutLabel();
 })();

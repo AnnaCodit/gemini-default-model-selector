@@ -163,8 +163,11 @@
   }
 
   async function restoreEditorFocus(timeoutMs = UI_TIMEOUT_MS, isCancelled) {
+    // activeElement остаётся полем даже после перехода в панель Chrome.
+    // Не отбираем фокус у popup, адресной строки или другой вкладки.
+    if (document.hidden || !document.hasFocus()) return false;
     const editor = await waitFor(findPromptEditor, timeoutMs, 0, isCancelled);
-    if (!editor || isCancelled?.()) {
+    if (!editor || isCancelled?.() || document.hidden || !document.hasFocus()) {
       return false;
     }
 

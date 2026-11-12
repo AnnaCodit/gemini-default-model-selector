@@ -241,6 +241,8 @@ function loadContent(options = {}) {
     for (const listener of documentListeners.get(type) || []) listener({ type, isTrusted });
   }
   document.hidden = Boolean(options.backgroundTab);
+  let pageFocused = options.pageFocused !== false;
+  document.hasFocus = () => pageFocused;
   // Document.hidden describes the tab's visibility; its DOM still has layout.
   document.getClientRects = () => [{}];
   document.head = document.append(new Element("head"));
@@ -624,6 +626,7 @@ function loadContent(options = {}) {
     get editor() { return editor; },
     get picker() { return picker; },
     document, computedStyle,
+    setPageFocused(value) { pageFocused = value; },
     clock: () => now,
     pendingTimers: () => timers.size,
     activeObservers: () => observers.filter((entry) => entry.observing).length,
@@ -681,6 +684,31 @@ test("cold start selects high from Russian medium without a translation dictiona
   assert.equal(page.document.activeElement, page.editor);
   assert.equal(page.editor.value, "draft");
   assert.deepEqual(page.editor.selection, [page.editor.value.length, page.editor.value.length]);
+});
+
+for (const backgroundTab of [false, true]) {
+  test(`startup never restores composer focus outside the page (hidden=${backgroundTab})`, async () => {
+    const page = loadContent({ backgroundTab, pageFocused: false });
+    await page.start();
+    assert.equal(page.state().level, "high");
+    assert.deepEqual(page.focusTimes.filter((entry) => entry.target === "TEXTAREA"), []);
+  });
+}
+
+test("opening the toolbar popup during verification cannot be undone by composer focus", async () => {
+  const page = loadContent({ clickDelay: 400 });
+  await page.runUntil(() => page.clicks.includes("high"));
+  page.setPageFocused(false);
+  await page.start();
+  assert.equal(page.state().level, "high");
+  assert.deepEqual(page.focusTimes.filter((entry) => entry.target === "TEXTAREA"), []);
+});
+
+test("losing browser focus while awaiting the editor prevents a late focus steal", async () => {
+  const page = loadContent({ editorReadyAfter: 1000 });
+  page.schedule(() => page.setPageFocused(false), 700);
+  await page.start();
+  assert.deepEqual(page.focusTimes.filter((entry) => entry.target === "TEXTAREA"), []);
 });
 
 for (const initialCaret of [0, 3]) {

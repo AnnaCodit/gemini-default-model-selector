@@ -137,6 +137,53 @@ legend {
   text-decoration: underline;
 }
 
+.site-access-warning {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 14px;
+  padding: 10px 11px;
+  border: 1px solid #ead7ae;
+  border-radius: 10px;
+  color: #5e4b27;
+  background: #fff8e9;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.site-access-warning[hidden] {
+  display: none;
+}
+
+.popup-shell:has(.site-access-warning:not([hidden])) .model-list {
+  gap: 6px;
+}
+
+.popup-shell:has(.site-access-warning:not([hidden])) .model-option {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.site-access-settings {
+  justify-self: start;
+  padding: 2px 0;
+  border: 0;
+  color: #526ff3;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 680;
+  text-align: left;
+  cursor: pointer;
+}
+
+.site-access-settings:hover {
+  text-decoration: underline;
+}
+
+.site-access-settings:focus-visible {
+  outline: 3px solid rgb(82 111 243 / 28%);
+  outline-offset: 2px;
+}
+
 .model-option {
   position: relative;
   gap: 12px;
@@ -337,6 +384,16 @@ legend {
 
   .shortcut-change {
     color: #9bb0ff;
+  }
+
+  .site-access-settings {
+    color: #9bb0ff;
+  }
+
+  .site-access-warning {
+    border-color: #5b4d32;
+    color: #eadbbd;
+    background: #2a261d;
   }
 
   .open-gemini:hover {
