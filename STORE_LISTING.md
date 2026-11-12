@@ -16,10 +16,10 @@ Gemini Default Model Selector automatically applies your saved preferences when 
 
 ✨ FEATURES
 
-- Choose 3.5 Flash-Lite, 3.8 Flash, 3.1 Pro, 4 Argon, or 4 Carbon.
+- Choose 3.5 Flash-Lite, 4 Hydrogen, 3.1 Pro, 4 Argon, or 4 Carbon.
 - Support both the new description-first model menu and the previous layout.
 - Skip account-locked model options and report when your preferred model is unavailable.
-- Graceful fallback to 3.7 Flash while Google progressively rolls out 3.8 Flash.
+- Automatically migrate saved Flash preferences to Hydrogen, with fallback to 3.8 Flash, then 3.7 Flash, if the newer model is absent from the menu.
 - Save a Low, Medium, or High thinking level independently of Gemini's interface language.
 - Support nested thinking menus opened by click or hover, keeping the same fast selection check.
 - Support the legacy Extended thinking toggle: Low disables it; Medium and High enable it.
@@ -60,7 +60,7 @@ Editable SVG sources for the icon and screenshots are included under `assets/ico
 
 To regenerate all transparent icon sizes (16, 32, 48, and 128 px) from the SVG, run `python assets/icons/render-icons.py`. The script also updates the icon copies used by the screenshot sources.
 
-Both screenshots show the current extension popup, rendered directly from `popup.html`, `popup.css`, and `popup.js`: light theme with Flash selected, and dark theme with Argon selected. The promotional image and icon do not depend on the model list.
+Both screenshots show the current extension popup, rendered directly from `popup.html`, `popup.css`, and `popup.js`: light theme with Hydrogen selected, and dark theme with Argon selected. The promotional image and icon do not depend on the model list.
 
 To regenerate the screenshots after changing the popup, run:
 

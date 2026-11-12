@@ -252,7 +252,7 @@ test("loads the Carbon model and preserves the popup model order", () => {
   const { models } = createPopupMock({ model: "carbon-4" });
   assert.deepEqual(
     models.map((model) => model.value),
-    ["flash-lite-3.5", "flash-3.8", "pro-3.1", "argon-4", "carbon-4"]
+    ["flash-lite-3.5", "hydrogen-4", "pro-3.1", "argon-4", "carbon-4"]
   );
   assert.equal(models.find((model) => model.value === "carbon-4")?.checked, true);
 });
@@ -265,7 +265,24 @@ test("migrates a disabled legacy preference when the popup loads", () => {
 test("loads defaults when storage is empty", () => {
   const mock = createPopupMock();
   assert.equal(mock.thinkings.find((item) => item.checked).value, "high");
-  assert.equal(mock.models.find((item) => item.checked).value, "flash-3.8");
+  assert.equal(mock.models.find((item) => item.checked).value, "hydrogen-4");
+});
+
+test("shows Hydrogen for saved Flash preferences without exposing legacy models", () => {
+  for (const model of ["flash-3.6", "flash-3.7", "flash-3.8", "hydrogen-4"]) {
+    const mock = createPopupMock({ model, thinkingLevel: "medium" });
+    assert.equal(mock.models.find((item) => item.checked)?.value, "hydrogen-4");
+    assert.equal(mock.models.some((item) => ["flash-3.7", "flash-3.8"].includes(item.value)), false);
+    assert.equal(mock.thinkings.find((item) => item.checked)?.value, "medium");
+  }
+});
+
+test("saves Hydrogen when selected in the popup", async () => {
+  const mock = createPopupMock({ model: "argon-4", thinkingLevel: "medium" });
+  mock.models.forEach((item) => (item.checked = item.value === "hydrogen-4"));
+  mock.panel.trigger("change");
+  await waitFor(() => mock.status.textContent === "Saved");
+  assert.equal(mock.runtimeSent[0].settings.model, "hydrogen-4");
 });
 
 test("sends the selected thinkingLevel to the worker", async () => {

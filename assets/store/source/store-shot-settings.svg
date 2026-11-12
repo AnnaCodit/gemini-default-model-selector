@@ -23,7 +23,7 @@
     <tspan x="96" dy="63">Your thinking level.</tspan>
   </text>
   <text x="96" y="440" fill="#5F687B" font-family="Segoe UI, Arial, sans-serif" font-size="22">
-    <tspan x="96" dy="0">Four models. Three thinking levels.</tspan>
+    <tspan x="96" dy="0">Five models. Three thinking levels.</tspan>
     <tspan x="96" dy="33">Your preferences are saved automatically.</tspan>
   </text>
   <g filter="url(#cardShadow)">

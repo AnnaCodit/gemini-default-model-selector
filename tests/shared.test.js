@@ -34,11 +34,11 @@ test("normalizes valid settings with thinkingLevel", () => {
 test("migrates legacy extendedThinking boolean to thinkingLevel", () => {
   assert.deepEqual(
     { ...core.normalizeSettings({ model: "flash-3.8", extendedThinking: false }) },
-    { model: "flash-3.8", thinkingLevel: "low", extendedThinking: false }
+    { model: "hydrogen-4", thinkingLevel: "low", extendedThinking: false }
   );
   assert.deepEqual(
     { ...core.normalizeSettings({ model: "flash-3.8", extendedThinking: true }) },
-    { model: "flash-3.8", thinkingLevel: "high", extendedThinking: true }
+    { model: "hydrogen-4", thinkingLevel: "high", extendedThinking: true }
   );
 });
 
@@ -153,7 +153,7 @@ test("migrates the former Flash model settings", () => {
         extendedThinking: false
       })
     },
-    { model: "flash-3.8", thinkingLevel: "low", extendedThinking: false }
+    { model: "hydrogen-4", thinkingLevel: "low", extendedThinking: false }
   );
   assert.deepEqual(
     {
@@ -162,7 +162,7 @@ test("migrates the former Flash model settings", () => {
         thinkingLevel: "high"
       })
     },
-    { model: "flash-3.8", thinkingLevel: "high", extendedThinking: true }
+    { model: "hydrogen-4", thinkingLevel: "high", extendedThinking: true }
   );
 });
 
@@ -183,6 +183,43 @@ test("resolves model with fallback when the newer model is not yet rolled out", 
     availableWith38.has(model.menuPrefix)
   );
   assert.equal(resolvedDirect?.id, "flash-3.8");
+});
+
+test("migrates all former Flash preferences to Hydrogen without changing thinking", () => {
+  for (const model of ["flash-3.6", "flash-3.7", "flash-3.8", "hydrogen-4"]) {
+    assert.deepEqual({ ...core.normalizeSettings({ model, thinkingLevel: "medium" }) },
+      { model: "hydrogen-4", thinkingLevel: "medium", extendedThinking: true });
+  }
+});
+
+test("recognizes Hydrogen picker labels without confusing other version 4 models", () => {
+  for (const label of ["4 Hydrogen", "Hydrogen", "Hydrogen Medium", "Hydrogen 4", "4 Hydrogen Высокая"]) {
+    assert.equal(core.inferPickerState(label).model, "hydrogen-4", label);
+  }
+  assert.equal(core.inferPickerState("Hydrogenated").model, null);
+  assert.equal(core.inferPickerState("4 Hydrogen and 4 Argon").ambiguous, true);
+  assert.equal(core.inferPickerState("Hydrogen and Flash").ambiguous, true);
+  assert.equal(core.matchesModelText("Everyday help 4 Hydrogen", "hydrogen-4"), true);
+});
+
+test("prefers Hydrogen then the newest available legacy Flash", () => {
+  for (const [available, expected] of [
+    [["hydrogen-4", "flash-3.8", "flash-3.7"], "hydrogen-4"],
+    [["flash-3.8", "flash-3.7"], "flash-3.8"],
+    [["flash-3.7"], "flash-3.7"],
+    [[], "hydrogen-4"]
+  ]) {
+    assert.equal(core.resolveModelWithFallback("hydrogen-4", (model) => available.includes(model.id)).id, expected);
+  }
+});
+
+test("excludes Hydrogen and legacy Flash rows from thinking options in a mixed menu", () => {
+  const options = [
+    { text: "Everyday help 4 Hydrogen" }, { text: "3.8 Flash All-around help" },
+    { text: "4 Argon Code & analysis" }, { text: "Low", followsSeparator: true },
+    { text: "Medium" }, { text: "High" }
+  ];
+  assert.equal(core.findThinkingOptionIndex(options, "medium"), 4);
 });
 
 test("finds thinking options independently of language in new 3-option UI", () => {

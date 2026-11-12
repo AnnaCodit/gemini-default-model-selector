@@ -175,7 +175,7 @@ test("opens Gemini with defaults when storage is empty", async () => {
   const { calls, messageListener } = loadBackground({});
   await sendRuntimeMessage(messageListener, { type: "GEMINI_OPEN_NEW_TAB" });
   const settings = calls.find(([name]) => name === "sendMessage")[2].settings;
-  assert.deepEqual(toPlain(settings), { model: "flash-3.8", thinkingLevel: "high", extendedThinking: true });
+  assert.deepEqual(toPlain(settings), { model: "hydrogen-4", thinkingLevel: "high", extendedThinking: true });
 });
 
 test("saves normalized popup settings and applies them to the active tab", async () => {
@@ -187,7 +187,7 @@ test("saves normalized popup settings and applies them to the active tab", async
 
   assert.deepEqual(toPlain(response), { ok: true, applied: true, saved: true });
   assert.deepEqual(toPlain(mock.getStored()), {
-    model: "flash-3.8", thinkingLevel: "medium", extendedThinking: true
+    model: "hydrogen-4", thinkingLevel: "medium", extendedThinking: true
   });
   const applied = mock.calls.find(([name]) => name === "sendMessage");
   assert.equal(applied[1], 101);

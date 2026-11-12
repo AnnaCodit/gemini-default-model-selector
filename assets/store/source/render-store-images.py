@@ -76,7 +76,7 @@ def main():
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path=find_browser(), headless=True)
         try:
-            for theme, model in (("light", "flash-3.8"), ("dark", "argon-4")):
+            for theme, model in (("light", "hydrogen-4"), ("dark", "argon-4")):
                 size = capture_popup(browser, theme, model)
                 print(f"Popup {theme}: {size[0]} x {size[1]}")
             for source_name, output_name in (

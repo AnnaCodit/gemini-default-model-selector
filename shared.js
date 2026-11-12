@@ -9,6 +9,13 @@
       menuPrefix: "3.5 Flash-Lite"
     }),
     Object.freeze({
+      id: "hydrogen-4",
+      label: "4 Hydrogen",
+      description: "Everyday help",
+      menuPrefix: "4 Hydrogen",
+      fallbackId: "flash-3.8"
+    }),
+    Object.freeze({
       id: "flash-3.8",
       label: "3.8 Flash",
       description: "All-around help",
@@ -45,7 +52,7 @@
   const STORAGE_KEYS = Object.freeze(["model", "thinkingLevel", "extendedThinking"]);
 
   const DEFAULT_SETTINGS = Object.freeze({
-    model: "flash-3.8",
+    model: "hydrogen-4",
     thinkingLevel: "high",
     extendedThinking: true
   });
@@ -55,8 +62,8 @@
   function normalizeSettings(value) {
     const candidate = value && typeof value === "object" ? value : {};
     let model = candidate.model;
-    if (model === "flash-3.6" || model === "flash-3.7") {
-      model = "flash-3.8";
+    if (["flash-3.6", "flash-3.7", "flash-3.8"].includes(model)) {
+      model = "hydrogen-4";
     }
 
     let thinkingLevel = candidate.thinkingLevel;
@@ -119,6 +126,7 @@
     for (const [phrase, modelId] of [
       ["Flash-Lite", "flash-lite-3.5"],
       ["Pro", "pro-3.1"],
+      ["Hydrogen", "hydrogen-4"],
       ["Argon", "argon-4"],
       ["Carbon", "carbon-4"]
     ]) {
@@ -158,14 +166,11 @@
     if (!target) {
       return null;
     }
-    if (typeof isAvailable !== "function" || isAvailable(target)) {
+    if (typeof isAvailable !== "function") {
       return target;
     }
-    if (target.fallbackId) {
-      const fallback = getModel(target.fallbackId);
-      if (fallback && isAvailable(fallback)) {
-        return fallback;
-      }
+    for (let candidate = target; candidate; candidate = getModel(candidate.fallbackId)) {
+      if (isAvailable(candidate)) return candidate;
     }
     return target;
   }

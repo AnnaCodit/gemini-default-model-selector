@@ -38,6 +38,7 @@ function loadContent(options = {}) {
   let labels = options.labels || ["Низкая", "Средний", "Высокая"];
   const stored = options.stored || { model: "flash-3.8", thinkingLevel: "high" };
   const modelLabels = {
+    "hydrogen-4": "4 Hydrogen",
     "flash-lite-3.5": "3.5 Flash-Lite",
     "flash-3.8": "3.8 Flash",
     "flash-3.7": "3.7 Flash",
@@ -46,6 +47,7 @@ function loadContent(options = {}) {
     "carbon-4": "4 Carbon"
   };
   const modelDescriptions = {
+    "hydrogen-4": "Everyday help",
     "flash-lite-3.5": "Quick answers",
     "flash-3.8": "All-around help",
     "flash-3.7": "All-around help",
@@ -1420,6 +1422,46 @@ test("waits for an independently closing submenu before restoring focus", async 
 });
 
 const currentModels = ["flash-lite-3.5", "flash-3.8", "pro-3.1", "argon-4", "carbon-4"];
+
+const hydrogenModels = ["flash-lite-3.5", "hydrogen-4", "pro-3.1", "argon-4", "carbon-4"];
+
+for (const availableModels of [hydrogenModels, [...hydrogenModels, "flash-3.8"]]) {
+  for (const target of hydrogenModels) {
+    test(`selects ${target} with ${availableModels.includes("flash-3.8") ? "mixed Hydrogen/Flash" : "Hydrogen"} menu`, async () => {
+      const page = loadContent({ descriptionFirst: true, noModelIds: true, noControls: true,
+        noMenuTestId: true, unrelatedMenu: true, nestedThinking: true, shortPickerLabels: true,
+        availableModels, initialModel: target === "hydrogen-4" ? "pro-3.1" : "hydrogen-4",
+        initialLevel: "low", resetThinkingOnModelChange: true,
+        stored: { model: target, thinkingLevel: "medium" } });
+      await page.start();
+      assert.deepEqual(page.errors, []);
+      assert.deepEqual(page.state(), { model: target, level: "medium", menuOpen: false });
+      assert.deepEqual(page.clicks, ["picker", target, "picker", "thinking-submenu", "medium"]);
+    });
+  }
+}
+
+for (const fallback of ["flash-3.8", "flash-3.7"]) {
+  test(`Hydrogen falls back to ${fallback} in legacy menus`, async () => {
+    const page = loadContent({ initialModel: "pro-3.1", initialLevel: "high", nestedThinking: true,
+      availableModels: ["pro-3.1", fallback], resetThinkingOnModelChange: true,
+      stored: { model: "hydrogen-4", thinkingLevel: "medium" } });
+    await page.start();
+    assert.deepEqual(page.errors, []);
+    assert.deepEqual(page.state(), { model: fallback, level: "medium", menuOpen: false });
+    assert.deepEqual(page.clicks, ["picker", fallback, "picker", "thinking-submenu", "medium"]);
+  });
+}
+
+test("a saved Flash preference selects Hydrogen when both models exist", async () => {
+  const page = loadContent({ initialModel: "flash-3.8", initialLevel: "medium", nestedThinking: true,
+    shortPickerLabels: true, availableModels: [...hydrogenModels, "flash-3.8"],
+    stored: { model: "flash-3.8", thinkingLevel: "medium" } });
+  await page.start();
+  assert.deepEqual(page.errors, []);
+  assert.deepEqual(page.state(), { model: "hydrogen-4", level: "medium", menuOpen: false });
+  assert.equal(page.clicks.filter((value) => value === "hydrogen-4").length, 1);
+});
 
 for (const target of currentModels) {
   test(`selects ${target} in the five-model menu with descriptions before model names`, async () => {

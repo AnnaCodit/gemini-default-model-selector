@@ -412,11 +412,11 @@
   }
 
   function findModelOption(items, model) {
-    const item = findMenuItem(items, model);
-    if (item) return { item, model };
-    const fallback = core.getModel(model.fallbackId);
-    const fallbackItem = fallback && findMenuItem(items, fallback);
-    return fallbackItem ? { item: fallbackItem, model: fallback } : null;
+    const effectiveModel = core.resolveModelWithFallback(model.id, (candidate) =>
+      Boolean(findMenuItem(items, candidate))
+    );
+    const item = effectiveModel && findMenuItem(items, effectiveModel);
+    return item ? { item, model: effectiveModel } : null;
   }
 
   function readMenuItemSelected(item) {
