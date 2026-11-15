@@ -19,13 +19,21 @@ importScripts("shared.js");
     return new Promise((resolve) => setTimeout(resolve, durationMs));
   }
 
-  async function sendMessageWhenReady(tabId, message) {
+  async function sendMessageWhenReady(tabId, createMessage) {
     const startedAt = Date.now();
     let lastError = null;
 
     while (Date.now() - startedAt < CONNECTION_TIMEOUT_MS) {
       try {
         await chrome.tabs.get(tabId);
+      } catch (error) {
+        lastError = error;
+        await delay(CONNECTION_RETRY_MS);
+        continue;
+      }
+
+      const message = await createMessage();
+      try {
         return await chrome.tabs.sendMessage(tabId, message);
       } catch (error) {
         lastError = error;
@@ -44,6 +52,23 @@ importScripts("shared.js");
       .then(() => chrome.storage.sync.set(settings));
     storageWriteQueue = write;
     return write;
+  }
+
+  async function readLatestSettings() {
+    while (true) {
+      const sequence = latestSaveSequence;
+      const pendingWrite = storageWriteQueue;
+      await pendingWrite.catch(() => undefined);
+      if (sequence !== latestSaveSequence || pendingWrite !== storageWriteQueue) {
+        continue;
+      }
+
+      const storedSettings = await chrome.storage.sync.get(core.STORAGE_KEYS);
+      if (sequence !== latestSaveSequence || pendingWrite !== storageWriteQueue) {
+        continue;
+      }
+      return core.normalizeSettings(storedSettings);
+    }
   }
 
   function captureActiveTab() {
@@ -119,17 +144,13 @@ importScripts("shared.js");
       throw new Error("Could not open a Gemini tab.");
     }
 
-    await storageWriteQueue.catch(() => undefined);
-    const settings = core.normalizeSettings(
-      await chrome.storage.sync.get(core.STORAGE_KEYS)
-    );
-    const result = await sendMessageWhenReady(tab.id, {
+    const result = await sendMessageWhenReady(tab.id, async () => ({
       type: APPLY_MESSAGE,
-      settings,
+      settings: await readLatestSettings(),
       focusComposer: true,
       waitForUi: true,
       initialApplication: true
-    });
+    }));
 
     if (!result?.ok || !result.applied) {
       throw new Error(

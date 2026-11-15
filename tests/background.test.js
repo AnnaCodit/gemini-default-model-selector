@@ -17,10 +17,13 @@ function loadBackground(
   const calls = [];
   let currentStored = { ...stored };
   let activeTabId = options.activeTabId ?? 101;
+  let remainingInitialSendFailures = options.initialSendFailures || 0;
   let commandListener = null;
   let messageListener = null;
   const storageWriteReleases = [];
+  const storageReadReleases = [];
   const applyReleases = [];
+  let storageReadCount = 0;
   const chrome = {
     commands: {
       onCommand: {
@@ -42,9 +45,14 @@ function loadBackground(
     storage: {
       sync: {
         async get(keys) {
+          const snapshot = { ...currentStored };
+          const readIndex = storageReadCount++;
           calls.push(["storageGet", keys]);
-          return Object.fromEntries(keys.filter((key) => key in currentStored)
-            .map((key) => [key, currentStored[key]]));
+          if (readIndex < (options.deferStorageReads || 0)) {
+            await new Promise((resolve) => storageReadReleases.push(resolve));
+          }
+          return Object.fromEntries(keys.filter((key) => key in snapshot)
+            .map((key) => [key, snapshot[key]]));
         },
         async set(items) {
           calls.push(["storageSet", { ...items }]);
@@ -73,6 +81,10 @@ function loadBackground(
       },
       async sendMessage(tabId, message) {
         calls.push(["sendMessage", tabId, message]);
+        if (message?.initialApplication && remainingInitialSendFailures > 0) {
+          remainingInitialSendFailures -= 1;
+          throw new Error("content script unavailable");
+        }
         if (options.sendMessageError) {
           throw new Error(options.sendMessageError);
         }
@@ -96,6 +108,7 @@ function loadBackground(
     messageListener,
     getStored: () => currentStored,
     setActiveTab(tabId) { activeTabId = tabId; },
+    releaseStorageRead(index) { storageReadReleases[index]?.(); },
     releaseStorageWrite(index) { storageWriteReleases[index]?.(); },
     releaseApply(index, result = { ok: true, applied: true }) {
       applyReleases[index]?.(result);
@@ -321,6 +334,67 @@ test("openGemini waits for pending popup writes before reading storage", async (
   assert(storageReadIndex > storageWriteIndex);
   assert.deepEqual(toPlain(newTabApply[2].settings), {
     model: "argon-4", thinkingLevel: "medium", extendedThinking: true
+  });
+});
+
+test("openGemini rereads settings when a popup save starts during storage read", async () => {
+  const mock = loadBackground(
+    { model: "argon-4", thinkingLevel: "low" },
+    { deferStorageReads: 1, deferStorageWrites: true }
+  );
+  const open = sendRuntimeMessage(mock.messageListener, { type: "GEMINI_OPEN_NEW_TAB" });
+  await waitFor(() => mock.calls.some(([name]) => name === "storageGet"));
+
+  mock.setActiveTab(42);
+  const save = sendRuntimeMessage(mock.messageListener, {
+    type: "GEMINI_SAVE_SETTINGS",
+    settings: { model: "carbon-4", thinkingLevel: "medium" }
+  });
+  await waitFor(() => mock.calls.some(([name]) => name === "storageSet"));
+
+  mock.releaseStorageRead(0);
+  mock.releaseStorageWrite(0);
+  await waitFor(() => mock.calls.filter(([name]) => name === "storageGet").length === 2);
+  const [openResponse, saveResponse] = await Promise.all([open, save]);
+
+  assert.deepEqual(toPlain(openResponse), { ok: true, tabId: 42 });
+  assert.equal(saveResponse.applied, true);
+  const newTabApply = mock.calls.find(([, tabId, message]) =>
+    tabId === 42 && message?.initialApplication === true
+  );
+  assert.deepEqual(toPlain(newTabApply[2].settings), {
+    model: "carbon-4", thinkingLevel: "medium", extendedThinking: true
+  });
+});
+
+test("openGemini refreshes settings before retrying a pending tab connection", async () => {
+  const mock = loadBackground(
+    { model: "argon-4", thinkingLevel: "low" },
+    { initialSendFailures: 1 }
+  );
+  const open = sendRuntimeMessage(mock.messageListener, { type: "GEMINI_OPEN_NEW_TAB" });
+  await waitFor(() => mock.calls.some(([, , message]) =>
+    message?.initialApplication === true
+  ));
+
+  mock.setActiveTab(42);
+  const save = sendRuntimeMessage(mock.messageListener, {
+    type: "GEMINI_SAVE_SETTINGS",
+    settings: { model: "carbon-4", thinkingLevel: "medium" }
+  });
+  const [openResponse, saveResponse] = await Promise.all([open, save]);
+
+  assert.deepEqual(toPlain(openResponse), { ok: true, tabId: 42 });
+  assert.equal(saveResponse.applied, true);
+  const initialApplies = mock.calls.filter(([, , message]) =>
+    message?.initialApplication === true
+  );
+  assert.equal(initialApplies.length, 2);
+  assert.deepEqual(toPlain(initialApplies[0][2].settings), {
+    model: "argon-4", thinkingLevel: "low", extendedThinking: false
+  });
+  assert.deepEqual(toPlain(initialApplies[1][2].settings), {
+    model: "carbon-4", thinkingLevel: "medium", extendedThinking: true
   });
 });
 
