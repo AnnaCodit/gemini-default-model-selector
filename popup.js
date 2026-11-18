@@ -6,6 +6,9 @@
   const OPEN_GEMINI_MESSAGE = "GEMINI_OPEN_NEW_TAB";
   const OPEN_GEMINI_COMMAND = "open-gemini";
   const settingsPanel = document.querySelector("#settings-panel");
+  const modelOptions = document.querySelector("#model-options");
+  const thinkingSection = document.querySelector("#thinking-section");
+  const thinkingSaved = document.querySelector("#thinking-saved");
   const openGeminiButton = document.querySelector("#open-gemini");
   const shortcutLabel = document.querySelector("#open-gemini-shortcut");
   const shortcutChangeButton = document.querySelector(
@@ -17,6 +20,10 @@
   const GEMINI_ORIGIN = "https://gemini.google.com/*";
   let settingsChangeSequence = 0;
   let settingsChanged = false;
+  let settings = core.DEFAULT_SETTINGS;
+  let modelCatalog = [];
+  let currentGeminiModel = null;
+  let catalogRequest = 0;
   settingsPanel.inert = true;
 
   function setStatus(message, kind = "info") {
@@ -47,18 +54,91 @@
       'input[name="thinkingLevel"]:checked'
     );
     return core.normalizeSettings({
-      model: checkedModel?.value,
-      thinkingLevel: checkedThinking?.value
+      model: checkedModel?.value ?? settings.model,
+      thinkingLevel: thinkingSection.disabled ? settings.thinkingLevel : checkedThinking?.value
+    });
+  }
+
+  function selectedCatalogModel() {
+    return core.resolveCatalogModel(modelCatalog, settings.model, currentGeminiModel);
+  }
+
+  function updateThinkingAccess(model = selectedCatalogModel()) {
+    thinkingSection.disabled = model === "auto";
+    thinkingSaved.hidden = !thinkingSection.disabled;
+  }
+
+  function renderModels() {
+    const selectedModel = selectedCatalogModel();
+    updateThinkingAccess(selectedModel);
+    if (!modelCatalog.length) {
+      const empty = document.createElement("p");
+      empty.className = "model-list-note";
+      empty.textContent = "Open Gemini to load your available models.";
+      modelOptions.replaceChildren(empty);
+      return;
+    }
+
+    const activeModelId = document.activeElement?.name === "model"
+      ? document.activeElement.value : null;
+    const rows = modelCatalog.map(({ id, label, available }, index) => {
+      const row = document.createElement("label");
+      const input = document.createElement("input");
+      const indicator = document.createElement("span");
+      const copy = document.createElement("span");
+      const title = document.createElement("strong");
+      row.className = "model-option";
+      input.type = "radio";
+      input.name = "model";
+      input.id = `model-option-${index}`;
+      input.value = id;
+      input.checked = id === selectedModel;
+      input.disabled = !available;
+      row.htmlFor = input.id;
+      indicator.className = "radio-indicator";
+      indicator.setAttribute("aria-hidden", "true");
+      copy.className = "model-copy";
+      title.textContent = label;
+      copy.append(title);
+      if (!available) {
+        const note = document.createElement("span");
+        note.className = "model-list-note";
+        note.textContent = "Unavailable";
+        copy.append(note);
+      }
+      row.append(input, indicator, copy);
+      return row;
+    });
+    modelOptions.replaceChildren(...rows);
+    if (activeModelId) {
+      modelOptions.querySelector(`input[value="${activeModelId}"]:enabled`)?.focus();
+    }
+  }
+
+  function loadModels(cached) {
+    const request = ++catalogRequest;
+    function showCatalog(result) {
+      if (request !== catalogRequest) return;
+      const models = core.readModelCatalog(result?.catalog);
+      modelCatalog = models.length ? models : core.readModelCatalog(cached);
+      currentGeminiModel = models.length ? result.currentModel : null;
+      renderModels();
+    }
+
+    // Доступность зависит от аккаунта Gemini. На открытой вкладке
+    // используем её список, а общий кэш нужен для остальных страниц.
+    chrome.tabs.query({ active: true, currentWindow: true }, ([tab] = []) => {
+      if (chrome.runtime.lastError || !tab?.id) {
+        showCatalog();
+        return;
+      }
+      chrome.tabs.sendMessage(tab.id, { type: core.READ_MODEL_CATALOG_MESSAGE }, (result) => {
+        showCatalog(chrome.runtime.lastError ? undefined : result);
+      });
     });
   }
 
   function writeForm(settings) {
-    const modelInput = settingsPanel.querySelector(
-      `input[name="model"][value="${settings.model}"]`
-    );
-    if (modelInput) {
-      modelInput.checked = true;
-    }
     const thinkingInput = settingsPanel.querySelector(
       `input[name="thinkingLevel"][value="${settings.thinkingLevel}"]`
     );
@@ -114,7 +194,8 @@
   }
 
   settingsPanel.addEventListener("change", () => {
-    const settings = readForm();
+    settings = readForm();
+    updateThinkingAccess();
     const sequence = ++settingsChangeSequence;
     settingsChanged = true;
     setStatus("Saving…");
@@ -170,12 +251,24 @@
     }
   });
 
+  let catalogChangedDuringLoad = false;
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local" || !changes[core.MODEL_CATALOG_KEY]) return;
+    catalogChangedDuringLoad = true;
+    loadModels(changes[core.MODEL_CATALOG_KEY].newValue);
+  });
+  chrome.storage.local.get(core.MODEL_CATALOG_KEY, (stored) => {
+    if (chrome.runtime.lastError || catalogChangedDuringLoad) return;
+    loadModels(stored[core.MODEL_CATALOG_KEY]);
+  });
+
   chrome.storage.sync.get(core.STORAGE_KEYS, (storedSettings) => {
     if (settingsChanged) {
       settingsPanel.inert = false;
       return;
     }
-    const settings = core.normalizeSettings(storedSettings);
+    settings = core.normalizeSettings(storedSettings);
+    renderModels();
     writeForm(settings);
     settingsPanel.inert = false;
     setStatus("Changes save automatically");

@@ -24,44 +24,10 @@
     <section id="settings-panel">
       <fieldset class="model-list">
         <legend>Choose the model</legend>
-        <label class="model-option">
-          <input type="radio" name="model" value="flash-lite-3.5">
-          <span class="radio-indicator" aria-hidden="true"></span>
-          <span class="model-copy">
-            <strong>3.5 Flash-Lite</strong>
-          </span>
-        </label>
-        <label class="model-option">
-          <input type="radio" name="model" value="hydrogen-4">
-          <span class="radio-indicator" aria-hidden="true"></span>
-          <span class="model-copy">
-            <strong>4 Hydrogen</strong>
-          </span>
-        </label>
-        <label class="model-option">
-          <input type="radio" name="model" value="pro-3.1">
-          <span class="radio-indicator" aria-hidden="true"></span>
-          <span class="model-copy">
-            <strong>3.1 Pro</strong>
-          </span>
-        </label>
-        <label class="model-option">
-          <input type="radio" name="model" value="argon-4">
-          <span class="radio-indicator" aria-hidden="true"></span>
-          <span class="model-copy">
-            <strong>4 Argon</strong>
-          </span>
-        </label>
-        <label class="model-option">
-          <input type="radio" name="model" value="carbon-4">
-          <span class="radio-indicator" aria-hidden="true"></span>
-          <span class="model-copy">
-            <strong>4 Carbon</strong>
-          </span>
-        </label>
+        <div id="model-options"></div>
       </fieldset>
-      <fieldset class="thinking-section">
-        <legend>Thinking level</legend>
+      <fieldset id="thinking-section" class="thinking-section">
+        <legend>Thinking level<span id="thinking-saved" hidden> (saved)</span></legend>
         <div class="thinking-grid">
           <label class="thinking-pill">
             <input type="radio" name="thinkingLevel" value="low">

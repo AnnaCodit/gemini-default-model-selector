@@ -18,8 +18,10 @@ Gemini Default Model Selector automatically applies your saved preferences when 
 
 - Choose 3.5 Flash-Lite, 4 Hydrogen, 3.1 Pro, 4 Argon, or 4 Carbon.
 - Support both the new description-first model menu and the previous layout.
-- Skip account-locked model options and report when your preferred model is unavailable.
-- Automatically migrate saved Flash preferences to Hydrogen, with fallback to 3.8 Flash, then 3.7 Flash, if the newer model is absent from the menu.
+- Show the models available in your Gemini menu, including new entries as they appear.
+- Keep your thinking preference when you choose Auto and restore it when you switch back.
+- Show account-locked models as unavailable. If your preferred model disappears from the menu, use an available model and keep your thinking preference.
+- Automatically migrate saved Flash preferences to Hydrogen.
 - Save a Low, Medium, or High thinking level independently of Gemini's interface language.
 - Support nested thinking menus opened by click or hover, keeping the same fast selection check.
 - Support the legacy Extended thinking toggle: Low disables it; Medium and High enable it.
@@ -42,12 +44,12 @@ Remember and apply the user's preferred Gemini model and thinking level on gemin
 
 ## Permission justification
 
-- `storage`: Stores the selected model identifier and thinking level in Chrome Sync, retaining a compatible legacy Boolean preference.
+- `storage`: Stores model and thinking preferences in Chrome Sync and caches the model list locally.
 - `https://gemini.google.com/*`: Reads and operates Gemini's model controls only on Gemini pages.
 
 ## Privacy disclosure
 
-The extension does not collect, sell, or transmit personal data. It stores only the selected model identifier, thinking level, and compatible legacy Boolean preference through `chrome.storage.sync`.
+The extension does not collect, sell, or transmit personal data. It uses `chrome.storage.sync` for model and thinking preferences and local browser storage for the list of model names, identifiers, and availability shown in the Gemini menu.
 
 ## Store images
 

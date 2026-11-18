@@ -40,6 +40,8 @@ function loadContent(options = {}) {
   const levels = ["low", "medium", "high"];
   let labels = options.labels || ["Низкая", "Средний", "Высокая"];
   const stored = options.stored || { model: "flash-3.8", thinkingLevel: "high" };
+  const catalogStorage = options.catalogStorage;
+  let catalogWrites = 0;
   const modelLabels = {
     "hydrogen-4": "4 Hydrogen",
     "flash-lite-3.5": "3.5 Flash-Lite",
@@ -47,7 +49,10 @@ function loadContent(options = {}) {
     "flash-3.7": "3.7 Flash",
     "pro-3.1": "3.1 Pro",
     "argon-4": "4 Argon",
-    "carbon-4": "4 Carbon"
+    "carbon-4": "4 Carbon",
+    auto: "Auto",
+    neon: "4 Neon",
+    future: "4 Hydrogen Plus"
   };
   const modelDescriptions = {
     "hydrogen-4": "Everyday help",
@@ -56,7 +61,9 @@ function loadContent(options = {}) {
     "flash-3.7": "All-around help",
     "pro-3.1": "Detailed research",
     "argon-4": "Code & analysis",
-    "carbon-4": "Most complex work"
+    "carbon-4": "Most complex work",
+    neon: "Deeper analysis",
+    future: "New capability"
   };
 
   function setTimer(callback, ms) {
@@ -422,10 +429,11 @@ function loadContent(options = {}) {
     if (options.noMenuTestId) delete menu.attrs["data-test-id"];
     for (const id of options.availableModels || ["flash-lite-3.5", "flash-3.8", "pro-3.1", "argon-4"]) {
       const item = menu.append(new Element("gem-menu-item", { role: "menuitem",
-        ...(options.noModelIds ? {} : { "data-mode-id": id }) }, options.descriptionFirst ? "" : modelLabels[id]));
+        ...(options.noModelIds ? {} : { "data-mode-id": options.siteModeIds?.[id] || id }) },
+      options.descriptionFirst ? "" : modelLabels[id]));
       if (options.descriptionFirst) {
-        item.append(new Element("span", {}, modelDescriptions[id])).classes.add("label");
-        item.append(new Element("span", {}, modelLabels[id])).classes.add("sublabel");
+        item.append(new Element("span", {}, id === "auto" ? "Auto" : modelDescriptions[id])).classes.add("label");
+        item.append(new Element("span", {}, id === "auto" ? "Adapts to your needs" : modelLabels[id])).classes.add("sublabel");
       }
       if (options.disabledModel === id) {
         if (options.modelBlocker === "disabled") {
@@ -609,6 +617,13 @@ function loadContent(options = {}) {
   }
   const chrome = {
     storage: {
+      local: catalogStorage && {
+        async get(key) { return { [key]: catalogStorage[key] }; },
+        async set(values) {
+          Object.assign(catalogStorage, JSON.parse(JSON.stringify(values)));
+          catalogWrites++;
+        }
+      },
       sync: { get(keys, callback) {
         storageCallback = () => callback(Object.fromEntries(
           keys.filter((key) => key in stored).map((key) => [key, stored[key]])
@@ -644,6 +659,7 @@ function loadContent(options = {}) {
   }
   return {
     clicks, clickTimes, focusTimes, keyboardEvents, errors,
+    get catalogWrites() { return catalogWrites; },
     get editor() { return editor; },
     get picker() { return picker; },
     document, computedStyle,
@@ -695,6 +711,76 @@ function loadContent(options = {}) {
     runUntil
   };
 }
+
+test("discovers a renamed catalog on each visit and applies new models by their site ID", async () => {
+  const catalogStorage = {};
+  const options = {
+    catalogStorage, descriptionFirst: true, shortPickerLabels: true,
+    indicator: "aria", initialModel: "hydrogen-4", initialLevel: "medium",
+    stored: { model: "mode:neon", thinkingLevel: "medium" },
+    modelsWithoutThinking: ["auto"], disabledModel: "carbon-4", modelBlocker: "lock-icon",
+    siteModeIds: { auto: "8c46e95b1a07cecc", "hydrogen-4": "hydrogen-native" },
+    availableModels: ["auto", "hydrogen-4", "neon", "carbon-4"]
+  };
+  const firstVisit = loadContent(options);
+  await firstVisit.start();
+  assert.deepEqual(firstVisit.state(), { model: "neon", level: "medium", menuOpen: false });
+  assert.deepEqual(catalogStorage.modelCatalog.map(({ id, label, available }) => [id, label, available]), [
+    ["auto", "Auto", true], ["hydrogen-4", "4 Hydrogen", true],
+    ["mode:neon", "4 Neon", true], ["carbon-4", "4 Carbon", false]
+  ]);
+
+  const unchangedVisit = loadContent(options);
+  await unchangedVisit.start();
+  assert.equal(unchangedVisit.catalogWrites, 0);
+
+  options.availableModels.push("future");
+  unchangedVisit.interact("click", true, unchangedVisit.picker);
+  unchangedVisit.picker.click();
+  await unchangedVisit.runUntil(() => unchangedVisit.catalogWrites === 1);
+  assert.equal(catalogStorage.modelCatalog.some(({ id }) => id === "mode:future"), true);
+  assert.equal(unchangedVisit.state().menuOpen, true);
+
+  const nextVisit = loadContent({
+    ...options, initialLevel: "low", availableModels: ["auto", "hydrogen-4", "future", "carbon-4"]
+  });
+  await nextVisit.start();
+  assert.deepEqual(nextVisit.state(), { model: "hydrogen-4", level: "medium", menuOpen: false });
+  assert.equal(catalogStorage.modelCatalog.some(({ id }) => id === "mode:neon"), false);
+  assert.equal(catalogStorage.modelCatalog.some(({ id }) => id === "mode:future"), true);
+  assert.equal((await nextVisit.apply({ model: "mode:future", thinkingLevel: "medium" })).applied, true);
+  assert.equal(nextVisit.state().model, "future");
+
+  const removedVisit = loadContent({
+    ...options, initialModel: "neon", stored: { model: "hydrogen-4", thinkingLevel: "medium" },
+    availableModels: ["auto", "neon", "future", "carbon-4"]
+  });
+  await removedVisit.start();
+  assert.equal(removedVisit.state().model, "neon");
+  assert.equal(removedVisit.clicks.includes("future"), false);
+
+  const noCurrentModel = loadContent({
+    ...options, initialModel: "neon", initialLevel: "low",
+    availableModels: ["carbon-4", "future", "auto"]
+  });
+  await noCurrentModel.start();
+  assert.deepEqual(noCurrentModel.state(), { model: "future", level: "medium", menuOpen: false });
+  assert.equal(noCurrentModel.clicks.includes("carbon-4"), false);
+});
+
+test("applies Auto without clicking a thinking control and restores the level on Hydrogen", async () => {
+  const page = loadContent({
+    catalogStorage: {}, descriptionFirst: true, shortPickerLabels: true,
+    initialModel: "hydrogen-4", initialLevel: "high", resetThinkingOnModelChange: true,
+    stored: { model: "auto", thinkingLevel: "high" },
+    modelsWithoutThinking: ["auto"], availableModels: ["auto", "hydrogen-4", "neon"]
+  });
+  await page.start();
+  assert.deepEqual(page.state(), { model: "auto", level: "low", menuOpen: false });
+  assert.deepEqual(page.clicks.filter((value) => value !== "picker"), ["auto"]);
+  assert.equal((await page.apply({ model: "hydrogen-4", thinkingLevel: "high" })).applied, true);
+  assert.deepEqual(page.state(), { model: "hydrogen-4", level: "high", menuOpen: false });
+});
 
 for (const options of [{ ignoreFirstPickerClicks: 1 }, { pickerHydratedAfter: 1400 }]) {
   test(`retries menu opening after an unhandled picker click: ${JSON.stringify(options)}`, async () => {

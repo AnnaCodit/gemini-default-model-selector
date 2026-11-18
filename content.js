@@ -33,6 +33,7 @@
   let initialObserver = null;
   let startupResetWatch = null;
   let lastModeMenu = null;
+  let modelCatalog = [];
 
   function isVisible(element) {
     if (!(element instanceof HTMLElement)) {
@@ -119,6 +120,10 @@
   }
 
   function readPickerState(picker) {
+    const modeId = getSiteModeId(picker);
+    const model = modeId && modelCatalog.find((entry) => entry.modeId === modeId);
+    if (model) return { model: model.id };
+
     function readLabel(node) {
       if (node.nodeType === 3) return node.textContent || "";
       if (node.matches?.(PICKER_DECORATION_SELECTOR)) return "";
@@ -127,9 +132,9 @@
     const text = readLabel(picker);
     // При перерисовке aria-label может ещё называть предыдущую модель.
     // Видимая подпись без thinking-бейджа приоритетнее этого запасного источника.
-    const visibleState = core.inferPickerState(text);
+    const visibleState = core.inferPickerState(text, modelCatalog);
     return visibleState.model || visibleState.ambiguous ? visibleState :
-      core.inferPickerState(picker.getAttribute("aria-label") || "");
+      core.inferPickerState(picker.getAttribute("aria-label") || "", modelCatalog);
   }
 
   function findPromptEditor() {
@@ -218,8 +223,7 @@
       }
       const menus = visibleMenus.filter((candidate) =>
         Array.from(candidate.querySelectorAll(MENU_ITEM_SELECTOR)).some((item) =>
-          item.hasAttribute("data-mode-id") ||
-          core.MODEL_OPTIONS.some((model) => findMenuItem([item], model))
+          isModelItem(item)
         )
       );
       menu = menus.length === 1 ? menus[0] : null;
@@ -257,8 +261,7 @@
 
   function findThinkingSubmenuTrigger(items = getVisibleMenuItems()) {
     const triggers = items.filter((item) =>
-      !item.hasAttribute("data-mode-id") &&
-      !core.MODEL_OPTIONS.some((model) => findMenuItem([item], model))
+      !isModelItem(item)
     ).map(getSubmenuTrigger).filter(Boolean);
     return triggers.length === 1 ? triggers[0] : null;
   }
@@ -419,14 +422,100 @@
   }
 
   function findMenuItem(items, model) {
-    return items.find((item) => {
+    if (model.modeId) {
+      const identified = items.filter((item) => getSiteModeId(item) === model.modeId);
+      if (identified.length) return identified.length === 1 ? identified[0] : null;
+    }
+    const matches = items.filter((item) => {
+      const modeId = getSiteModeId(item);
+      if (model.id.startsWith("mode:") || (model.modeId && modeId) ||
+          (modeId && modelCatalog.some((entry) => entry.modeId === modeId && entry.id !== model.id))) {
+        return false;
+      }
       // В новом меню описание идёт перед моделью, а textContent соседних
       // элементов может склеиваться без пробела. Проверяем и отдельные подписи.
       const labels = [item.textContent, item.getAttribute("aria-label"),
         ...Array.from(item.querySelectorAll(".label, .sublabel, span"))
           .map((label) => label.textContent)];
       return labels.some((label) => core.matchesModelText(label, model));
-    }) || null;
+    });
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  function getSiteModeId(item) {
+    const modeId = item.getAttribute("data-mode-id") ||
+      /^bard-mode-option-(.+)$/.exec(item.getAttribute("data-test-id") || "")?.[1];
+    return core.isModeId(modeId) ? modeId : null;
+  }
+
+  function isModelItem(item) {
+    return Boolean(getSiteModeId(item) ||
+      core.MODEL_OPTIONS.some((model) => findMenuItem([item], model)));
+  }
+
+  function readCatalogEntries(modelRows, previousCatalog) {
+    const rows = modelRows.map((item) => ({
+      item,
+      modeId: getSiteModeId(item),
+      primary: core.normalizeText(item.querySelector(".label, .mdc-list-item__primary-text")?.textContent),
+      secondary: core.normalizeText(item.querySelector(".sublabel, .mdc-list-item__secondary-text")?.textContent),
+      text: core.normalizeText(item.getAttribute("aria-label") || item.textContent)
+    }));
+    // В текущем меню название находится под описанием. В старом варианте
+    // порядок обратный, а Auto и в новом меню остаётся основным заголовком.
+    const versioned = (text) => /^\d+(?:\.\d+)*\s+\S/.test(text);
+    const descriptionFirst = rows.some(({ secondary }) => versioned(secondary)) &&
+      !rows.some(({ primary }) => versioned(primary));
+    const entries = rows.map(({ item, modeId, primary, secondary, text }) => {
+      const auto = modeId === core.AUTO_MODE_ID || /^auto$/i.test(primary || text);
+      const cached = modeId && !modeId.startsWith("upsell_") &&
+        previousCatalog.find((model) => model.modeId === modeId);
+      const known = core.MODEL_OPTIONS.find((model) =>
+        modeId === model.id || [primary, secondary, text].includes(model.label)
+      );
+      const label = auto ? primary || "Auto" :
+        (descriptionFirst ? secondary || primary : primary || secondary) ||
+        known?.label || text;
+      const legacyFlash = ["flash-3.7", "flash-3.8"].includes(known?.id);
+      const id = auto ? "auto" : legacyFlash && modeId ? `mode:${modeId}` :
+        cached?.id || known?.id || (modeId && `mode:${modeId}`);
+      return { id, label, modeId, available: isModelOptionEnabled(item) };
+    });
+    const catalog = core.readModelCatalog(entries);
+    return catalog.length === rows.length ? catalog : [];
+  }
+
+  async function refreshModelCatalog(timeoutMs, isCancelled, open = true) {
+    const stored = await chrome.storage.local.get(core.MODEL_CATALOG_KEY).catch(() => ({}));
+    const previousCatalog = core.readModelCatalog(stored[core.MODEL_CATALOG_KEY]);
+    if (isCancelled?.()) return;
+    if (open && !await openModeMenu(timeoutMs, isCancelled)) return;
+
+    let previousSignature = null;
+    let since = 0;
+    const catalog = await waitFor(() => {
+      const modelRows = getVisibleMenuItems().filter(isModelItem);
+      const reportsSelection = modelRows.length && modelRows.every((item) => item.hasAttribute("aria-checked"));
+      const ambiguousSelection = reportsSelection &&
+        modelRows.filter((item) => item.getAttribute("aria-checked") === "true").length > 1;
+      const entries = ambiguousSelection ? [] : readCatalogEntries(modelRows, previousCatalog);
+      const signature = entries.some(({ available }) => available) ? JSON.stringify(entries) : null;
+      if (signature !== previousSignature) {
+        previousSignature = signature;
+        since = Date.now();
+      }
+      return signature && Date.now() - since >= STATE_STABLE_MS ? entries : null;
+    }, UI_TIMEOUT_MS, 0, isCancelled);
+    if (!catalog) return;
+
+    modelCatalog = catalog;
+    try {
+      if (JSON.stringify(stored[core.MODEL_CATALOG_KEY]) !== JSON.stringify(catalog)) {
+        await chrome.storage.local.set({ [core.MODEL_CATALOG_KEY]: catalog });
+      }
+    } catch {
+      // Кэш помогает popup, но не нужен для работы с уже прочитанным меню.
+    }
   }
 
   function isModelOptionEnabled(item) {
@@ -436,7 +525,7 @@
     }
     // Заблокированная подпиской модель может оставаться кликабельной,
     // открывая предложение обновить тариф вместо переключения модели.
-    return !Array.from(item.querySelectorAll(
+    return !getSiteModeId(item)?.startsWith("upsell_") && !Array.from(item.querySelectorAll(
       'mat-icon, [data-mat-icon-name], [fonticon]'
     )).some((icon) => isVisible(icon) && [
       icon.getAttribute("data-mat-icon-name"), icon.getAttribute("fonticon"),
@@ -445,11 +534,18 @@
   }
 
   function findModelOption(items, model) {
-    const effectiveModel = core.resolveModelWithFallback(model.id, (candidate) =>
-      Boolean(findMenuItem(items, candidate))
-    );
-    const item = effectiveModel && findMenuItem(items, effectiveModel);
-    return item ? { item, model: effectiveModel } : null;
+    const findLiveModel = (candidate) => {
+      const exact = modelCatalog.find(({ id }) => id === candidate.id);
+      if (exact || !core.getModel(candidate.id)) return exact || candidate;
+      const byLabel = modelCatalog.filter(({ label }) => label === candidate.label);
+      return byLabel.length === 1 ? byLabel[0] : candidate;
+    };
+    const effectiveModel = core.resolveModelWithFallback(model.id, (candidate) => {
+      return Boolean(findMenuItem(items, findLiveModel(candidate)));
+    }) || model;
+    const live = findLiveModel(effectiveModel);
+    const item = findMenuItem(items, live);
+    return item ? { item, model: live } : null;
   }
 
   function readMenuItemSelected(item) {
@@ -526,8 +622,7 @@
   function getThinkingMenuInfo(items) {
     const options = items.map((item) => ({
       text: item.textContent,
-      isModel: item.hasAttribute("data-mode-id") ||
-        core.MODEL_OPTIONS.some((model) => findMenuItem([item], model)),
+      isModel: isModelItem(item),
       isSubmenu: Boolean(getSubmenuTrigger(item)),
       isRadio: item.getAttribute("role") === "menuitemradio" ||
         item.getAttribute("role") === "radio" ||
@@ -629,14 +724,16 @@
       const picker = findModePicker();
       return isControlEnabled(picker) && readPickerState(picker).model === modelId &&
         isModeMenuClosed() && (!confirmation?.submenu || !isVisible(confirmation.submenu)) &&
-        matchesThinkingConfirmation(confirmation);
+        (modelId === "auto" || matchesThinkingConfirmation(confirmation));
     }, timeoutMs, STATE_STABLE_MS, isCancelled);
   }
 
   async function selectModel(modelId, targetLevel, timeoutMs = UI_TIMEOUT_MS, isCancelled) {
-    const model = core.getModel(modelId);
+    const model = modelCatalog.find(({ id }) => id === modelId) || core.getModel(modelId);
     if (!model) {
-      throw new Error(`Unknown model: ${modelId}`);
+      throw Object.assign(new Error("Your saved model is unavailable in this Gemini menu."), {
+        retryable: false
+      });
     }
 
     for (let attempt = 0; attempt < MAX_INTERACTION_ATTEMPTS; attempt += 1) {
@@ -671,7 +768,8 @@
 
       // Если уровни уже видны, их подписи помогают избежать лишнего открытия.
       // Их наличие у старой модели не должно блокировать выбор новой модели.
-      const thinkingConfirmation = createThinkingConfirmation(getVisibleThinkingMenuInfo(), targetLevel);
+      const thinkingConfirmation = effectiveModel.id === "auto" ? null :
+        createThinkingConfirmation(getVisibleThinkingMenuInfo(), targetLevel);
       if (currentModel === effectiveModel.id) {
         return { modelId: effectiveModel.id, changed: false, thinkingConfirmation };
       }
@@ -765,25 +863,33 @@
 
     const editorWasFocused = captureEditorFocus();
     let changed = false;
-    let effectiveModelId = targetSettings.model;
     let thinkingConfirmation = null;
     let failed = true;
 
     try {
+      if (chrome.storage.local && (!modelCatalog.length || (!core.getModel(targetSettings.model) &&
+          !modelCatalog.some(({ id }) => id === targetSettings.model)))) {
+        await refreshModelCatalog(timeoutMs, options.isCancelled);
+      }
+      const loadedPicker = findModePicker();
+      const requestedModel = core.resolveCatalogModel(
+        modelCatalog, targetSettings.model, loadedPicker && readPickerState(loadedPicker).model
+      );
+      let effectiveModelId = requestedModel;
       for (let attempt = 0; attempt < MAX_INTERACTION_ATTEMPTS; attempt += 1) {
         try {
           const currentPicker = findModePicker();
           ensureApplicationActive(options.isCancelled);
           if (!currentPicker || readPickerState(currentPicker).model !== effectiveModelId) {
             const selectionResult = await selectModel(
-              targetSettings.model, targetSettings.thinkingLevel, timeoutMs, options.isCancelled
+              requestedModel, targetSettings.thinkingLevel, timeoutMs, options.isCancelled
             );
             effectiveModelId = selectionResult.modelId;
             changed ||= selectionResult.changed;
             thinkingConfirmation = selectionResult.thinkingConfirmation;
           }
 
-          if (!matchesThinkingConfirmation(thinkingConfirmation)) {
+          if (effectiveModelId !== "auto" && !matchesThinkingConfirmation(thinkingConfirmation)) {
             const thinkingResult = await setThinkingLevel(
               targetSettings.thinkingLevel, timeoutMs, options.isCancelled
             );
@@ -796,7 +902,7 @@
             failed = false;
             options.onConfirmed?.(thinkingConfirmation);
             if (options.initialApplication && options.applyId === latestApplyId) {
-              watchForStartupReset(targetSettings, thinkingConfirmation, effectiveModelId);
+              watchForStartupReset(targetSettings, thinkingConfirmation, effectiveModelId, requestedModel);
             }
             return { applied: true, changed };
           }
@@ -849,7 +955,7 @@
     startupResetWatch = null;
   }
 
-  function watchForStartupReset(settings, confirmation, modelId) {
+  function watchForStartupReset(settings, confirmation, modelId, requestedModel) {
     stopStartupResetWatch();
     let cancelled = false;
     let recovering = false;
@@ -890,7 +996,8 @@
     function needsRecovery() {
       const picker = findModePicker();
       return isControlEnabled(picker) && isModeMenuClosed() &&
-        (readPickerState(picker).model !== modelId || !matchesThinkingConfirmation(confirmation));
+        (readPickerState(picker).model !== modelId ||
+          (modelId !== "auto" && !matchesThinkingConfirmation(confirmation)));
     }
 
     function check() {
@@ -912,7 +1019,8 @@
       // успешной проверки. Разрешаем два восстановления в исходном окне,
       // без вечного автопереключения и продления окна после каждого сброса.
       const request = enqueueApply({
-        settings, timeoutMs: COLD_START_UI_TIMEOUT_MS, isCancelled: () => cancelled,
+        settings: requestedModel === settings.model ? settings : { ...settings, model: requestedModel },
+        timeoutMs: COLD_START_UI_TIMEOUT_MS, isCancelled: () => cancelled,
         onConfirmed: (nextConfirmation) => { confirmation = nextConfirmation; }
       });
       if (initialApplicationSettings === settings) initialApplicationRequest = request;
@@ -1007,6 +1115,20 @@
     });
   }
 
+  if (chrome.storage.local) {
+    // Обновляем каталог и при ручном открытии, если Gemini дозагрузил
+    // пункты после старта или вкладка осталась открытой во время обновления.
+    let manualRefresh = 0;
+    document.addEventListener("click", (event) => {
+      if (!event.isTrusted) return;
+      const picker = findModePicker();
+      if (!picker?.contains(event.target)) return;
+      const sequence = ++manualRefresh;
+      if (picker.getAttribute("aria-expanded") === "true") return;
+      refreshModelCatalog(UI_TIMEOUT_MS, () => sequence !== manualRefresh, false).catch(() => {});
+    }, true);
+  }
+
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "sync") {
       return;
@@ -1032,6 +1154,12 @@
   });
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === core.READ_MODEL_CATALOG_MESSAGE) {
+      const picker = findModePicker();
+      sendResponse({ catalog: modelCatalog, currentModel: picker && readPickerState(picker).model });
+      return false;
+    }
+
     if (message?.type === APPLY_MESSAGE) {
       currentSettings = core.normalizeSettings(message.settings);
       // Команда открытия новой вкладки может прийти после завершения startup.

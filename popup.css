@@ -72,7 +72,7 @@ legend {
   text-transform: uppercase;
 }
 
-.model-list {
+#model-options {
   display: grid;
   gap: 8px;
 }
@@ -154,7 +154,7 @@ legend {
   display: none;
 }
 
-.popup-shell:has(.site-access-warning:not([hidden])) .model-list {
+.popup-shell:has(.site-access-warning:not([hidden])) #model-options {
   gap: 6px;
 }
 
@@ -196,7 +196,7 @@ legend {
     box-shadow 140ms ease;
 }
 
-.model-option:hover {
+.model-option:has(input:enabled):hover {
   border-color: #9bbcff;
   background: #f9fbff;
 }
@@ -256,6 +256,21 @@ legend {
   font-weight: 680;
 }
 
+.model-list-note {
+  display: block;
+  font-size: 12px;
+}
+
+.model-option:has(input:disabled),
+.thinking-section:disabled .thinking-pill {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.model-copy .model-list-note {
+  margin-top: 3px;
+}
+
 .thinking-section {
   margin-top: 14px;
 }
@@ -302,7 +317,7 @@ legend {
   font-weight: 650;
 }
 
-.thinking-pill:hover .pill-label {
+.thinking-pill:has(input:enabled):hover .pill-label {
   color: #202124;
 }
 
@@ -365,7 +380,7 @@ legend {
     color: #9aa0a6;
   }
 
-  .thinking-pill:hover .pill-label {
+  .thinking-pill:has(input:enabled):hover .pill-label {
     color: #e8eaed;
   }
 
@@ -401,7 +416,7 @@ legend {
     background: #282c35;
   }
 
-  .model-option:hover {
+  .model-option:has(input:enabled):hover {
     border-color: #738cd8;
     background: #282c35;
   }

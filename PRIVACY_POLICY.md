@@ -1,6 +1,6 @@
 # Privacy Policy for Gemini Default Model Selector
 
-**Last Updated:** October 10, 2026
+**Last Updated:** November 19, 2026
 
 ## 1. Overview
 This Privacy Policy describes how the **Gemini Default Model Selector** Chrome Extension ("Extension", "we", "us", or "our") handles your data. We are committed to protecting user privacy. This Extension is designed to operate locally on your browser with strict data minimization principles.
@@ -9,17 +9,19 @@ This Privacy Policy describes how the **Gemini Default Model Selector** Chrome E
 **We do not collect, transmit, store on external servers, or sell any personal data, sensitive information, browsing history, prompts, or communication content.**
 
 ### Stored Data
-The Extension stores only non-personally identifiable preference settings locally on your device:
+The Extension stores these non-personally identifiable preferences on your device:
 - Selected preferred Gemini model identifier (e.g., `3.5 Flash-Lite`, `3.8 Flash`, `3.1 Pro`)
 - Selected thinking level (`low`, `medium`, or `high`) and its compatible legacy Extended thinking state (enabled/disabled)
 
 These preferences are saved using Chrome's native `chrome.storage.sync` API. If you are signed into Google Chrome with Chrome Sync enabled, Chrome may synchronize these preference settings across your logged-in browser instances using Google's infrastructure. We do not have access to your Google Account or external storage servers.
 
+The Extension also caches model names, identifiers and availability as shown in the Gemini model menu. This cache stays in the local extension storage in your browser and is used to show the list of models in the popup.
+
 ## 3. Extension Permissions
 The Extension requests the following browser permissions strictly for core functional purposes:
 
-* **`storage`**: Used exclusively to store and retrieve your saved default model preferences locally across browser sessions.
-* **`https://gemini.google.com/*`**: Used strictly to apply your saved model settings automatically when you load the `gemini.google.com` website. The Extension interacts solely with Gemini's interface elements to select your preferred model. It does **not** read, save, track, or transmit your conversation history, prompts, or account information.
+* **`storage`**: Stores your model preferences and the local list of models.
+* **`https://gemini.google.com/*`**: Reads Gemini's model menu and applies your saved model settings automatically. It does **not** read, save, track, or transmit your conversation history, prompts, or account information.
 
 ## 4. Data Sharing and Selling
 - **No Third-Party Transfer:** We do not sell, license, trade, or transfer any user data to third parties.

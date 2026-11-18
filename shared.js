@@ -50,6 +50,10 @@
 
   const THINKING_LEVELS = Object.freeze(["low", "medium", "high"]);
   const STORAGE_KEYS = Object.freeze(["model", "thinkingLevel", "extendedThinking"]);
+  const MODEL_CATALOG_KEY = "modelCatalog";
+  const READ_MODEL_CATALOG_MESSAGE = "GEMINI_READ_MODEL_CATALOG";
+  // Gemini exposes this option without a thinking menu, including in localized UIs.
+  const AUTO_MODE_ID = "8c46e95b1a07cecc";
 
   const DEFAULT_SETTINGS = Object.freeze({
     model: "hydrogen-4",
@@ -58,6 +62,32 @@
   });
 
   const MODEL_IDS = new Set(MODEL_OPTIONS.map((model) => model.id));
+
+  function isModeId(value) {
+    return typeof value === "string" && /^[a-z0-9_-]{1,100}$/i.test(value);
+  }
+
+  function isModelId(value) {
+    return MODEL_IDS.has(value) || value === "auto" ||
+      (typeof value === "string" && value.startsWith("mode:") && isModeId(value.slice(5)));
+  }
+
+  function readModelCatalog(value) {
+    if (!Array.isArray(value)) return [];
+    const models = new Map();
+    for (const entry of value) {
+      if (!isModelId(entry?.id) || typeof entry.label !== "string") continue;
+      const label = normalizeText(entry.label);
+      if (!label || label.length > 120) continue;
+      models.set(entry.id, {
+        id: entry.id,
+        label,
+        modeId: isModeId(entry.modeId) ? entry.modeId : null,
+        available: entry.available === true
+      });
+    }
+    return [...models.values()];
+  }
 
   function normalizeSettings(value) {
     const candidate = value && typeof value === "object" ? value : {};
@@ -76,10 +106,16 @@
     }
 
     return {
-      model: MODEL_IDS.has(model) ? model : DEFAULT_SETTINGS.model,
+      model: isModelId(model) ? model : DEFAULT_SETTINGS.model,
       thinkingLevel,
       extendedThinking: thinkingLevel !== "low"
     };
+  }
+
+  function resolveCatalogModel(catalog, preferredModel, currentModel) {
+    if (catalog.some(({ id }) => id === preferredModel)) return preferredModel;
+    const active = catalog.find(({ id, available }) => available && id === currentModel);
+    return active?.id ?? catalog.find(({ available }) => available)?.id ?? preferredModel;
   }
 
   function normalizeText(value) {
@@ -111,7 +147,17 @@
     return Boolean(target && matchesTextPhrase(value, target.label));
   }
 
-  function inferPickerState(value) {
+  function inferPickerState(value, catalog = []) {
+    const text = normalizeText(value).replace(/^open mode picker, currently\s+/i, "")
+      .toLowerCase();
+    for (const labelFor of [
+      (label) => label,
+      (label) => label.replace(/^\d+(?:\.\d+)*\s+/, "")
+    ]) {
+      const matches = catalog.filter(({ label }) => labelFor(label).toLowerCase() === text);
+      if (matches.length) return matches.length === 1 ? { model: matches[0].id } :
+        { model: null, ambiguous: true };
+    }
     const labelMatches = new Set();
     const versionMatches = new Map();
     for (const candidate of MODEL_OPTIONS) {
@@ -231,8 +277,11 @@
   }
 
   globalScope.GeminiDefaultModelCore = Object.freeze({
+    AUTO_MODE_ID,
     DEFAULT_SETTINGS,
+    MODEL_CATALOG_KEY,
     MODEL_OPTIONS,
+    READ_MODEL_CATALOG_MESSAGE,
     STORAGE_KEYS,
     THINKING_LEVELS,
     findExtendedOptionIndex,
@@ -240,9 +289,12 @@
     findThinkingOptions,
     getModel,
     inferPickerState,
+    isModeId,
     matchesModelText,
     normalizeSettings,
     normalizeText,
+    readModelCatalog,
+    resolveCatalogModel,
     resolveModelWithFallback
   });
 })(globalThis);
