@@ -23,8 +23,8 @@
     <tspan x="96" dy="63">Your thinking level.</tspan>
   </text>
   <text x="96" y="440" fill="#5F687B" font-family="Segoe UI, Arial, sans-serif" font-size="22">
-    <tspan x="96" dy="0">Five models. Three thinking levels.</tspan>
-    <tspan x="96" dy="33">Your preferences are saved automatically.</tspan>
+    <tspan x="96" dy="0">The list follows your Gemini menu.</tspan>
+    <tspan x="96" dy="33">New models appear when you get access.</tspan>
   </text>
   <g filter="url(#cardShadow)">
     <rect x="776" y="112" width="380" height="576" rx="28" fill="#F8FAFD" stroke="#D8DCE7"/>

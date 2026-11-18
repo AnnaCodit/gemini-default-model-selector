@@ -11,9 +11,6 @@
     <filter id="frameShadow" x="650" y="20" width="620" height="780" filterUnits="userSpaceOnUse">
       <feDropShadow dx="0" dy="24" stdDeviation="26" flood-color="#000000" flood-opacity="0.42"/>
     </filter>
-    <filter id="badgeShadow" x="800" y="660" width="370" height="140" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#26338B" flood-opacity="0.42"/>
-    </filter>
     <clipPath id="popupClip"><rect x="776" y="92" width="380" height="576" rx="28"/></clipPath>
   </defs>
   <rect width="1280" height="800" fill="#0E1120"/>
@@ -22,12 +19,12 @@
   <image x="88" y="67" width="42" height="42" xlink:href="icon-48.png"/>
   <text x="144" y="95" fill="#B9C1D8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="650">Gemini Default Model Selector</text>
   <text x="88" y="266" fill="#F5F7FF" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="-1.6">
-    <tspan x="88" dy="0">Your defaults.</tspan>
-    <tspan x="88" dy="64">Ready every visit.</tspan>
+    <tspan x="88" dy="0">Switch to Auto.</tspan>
+    <tspan x="88" dy="64">Keep your level.</tspan>
   </text>
   <text x="88" y="423" fill="#ADB6CE" font-family="Segoe UI, Arial, sans-serif" font-size="22">
-    <tspan x="88" dy="0">Five models. Three thinking levels.</tspan>
-    <tspan x="88" dy="34">Applied automatically when Gemini opens.</tspan>
+    <tspan x="88" dy="0">Switch back to a model with thinking controls.</tspan>
+    <tspan x="88" dy="34">Your saved level is ready to use.</tspan>
   </text>
   <rect x="88" y="548" width="88" height="42" rx="12" fill="#262D45" stroke="#4C5890"/>
   <text x="132" y="575" fill="#E1E7FF" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="middle">Alt+G</text>
@@ -39,9 +36,4 @@
     <image x="776" y="92" width="380" height="576" xlink:href="popup-settings-dark.png"/>
   </g>
   <rect x="776" y="92" width="380" height="576" rx="28" fill="none" stroke="#424654"/>
-  <g filter="url(#badgeShadow)">
-    <rect x="841" y="700" width="249" height="52" rx="26" fill="#526FF3"/>
-  </g>
-  <image x="857" y="713" width="26" height="26" xlink:href="icon-32.png"/>
-  <text x="896" y="733" fill="#EEF1FF" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">Applied automatically</text>
 </svg>

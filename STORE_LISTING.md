@@ -6,37 +6,28 @@ Gemini Default Model Selector
 
 ## Summary
 
-Automatically applies your preferred Gemini model and thinking level when Gemini opens.
+Set a default Gemini model and thinking level. The model list refreshes from your Gemini menu.
 
 ## Description
 
-Choose the Gemini model and thinking level you want to use by default across visits.
+Start each visit to Gemini with your preferred model and thinking level already set.
 
-Gemini Default Model Selector automatically applies your saved preferences when you open gemini.google.com. You can still switch models manually for the current tab—the extension will not override that choice until the page is reloaded.
+FEATURES
 
-✨ FEATURES
+• Choose from the models in your Gemini menu. New models appear in the extension dynamically as they become available to your account.
+• If your preferred model disappears, the extension uses an available model and keeps your thinking level. Models locked to another plan are marked unavailable.
+• Save Low, Medium, or High. When you choose Auto, your saved level is ready to use the next time you switch to a model with thinking controls.
+• Press Alt+G (Option+G on Mac) to open Gemini and focus the prompt. You can change the shortcut in Chrome's extension settings.
 
-- Choose 3.5 Flash-Lite, 4 Hydrogen, 3.1 Pro, 4 Argon, or 4 Carbon.
-- Support both the new description-first model menu and the previous layout.
-- Show the models available in your Gemini menu, including new entries as they appear.
-- Keep your thinking preference when you choose Auto and restore it when you switch back.
-- Show account-locked models as unavailable. If your preferred model disappears from the menu, use an available model and keep your thinking preference.
-- Automatically migrate saved Flash preferences to Hydrogen.
-- Save a Low, Medium, or High thinking level independently of Gemini's interface language.
-- Support nested thinking menus opened by click or hover, keeping the same fast selection check.
-- Support the legacy Extended thinking toggle: Low disables it; Medium and High enable it.
-- Apply saved preferences automatically when Gemini opens.
-- Keep manual model changes for the current tab.
-- Return focus to the prompt with the caret at the end of the current text after switching.
-- Sync preferences with Chrome Sync.
-- No analytics, ads, or external data transmission.
+HOW TO USE
 
-💥 BONUS
-- Open a new Gemini tab and focus its prompt with Alt+G
-- Change shortcut in Chrome extensions settings
+Open Gemini once to load your model list, then click the extension icon and choose your defaults. Chrome needs to allow the extension to run on gemini.google.com for it to apply them on future visits. You can still change models directly in Gemini for the current tab.
 
+PRIVACY
 
-This extension is not affiliated with Google. Gemini is a trademark of Google LLC.
+The model list stays in your browser. Chrome can sync your preferences across devices when Chrome Sync is enabled. The extension does not collect prompts, chat history, or analytics.
+
+Gemini Default Model Selector is an independent extension. Gemini is a trademark of Google LLC.
 
 ## Single purpose
 
@@ -53,18 +44,18 @@ The extension does not collect, sell, or transmit personal data. It uses `chrome
 
 ## Store images
 
-- Store icon: `assets/icons/icon-128.png`
-- Small promotional image: `assets/store/promo-small-440x280.png`
-- Screenshot 1: `assets/store/screenshot-1-settings-1280x800.png`
-- Screenshot 2: `assets/store/screenshot-2-applied-1280x800.png`
+- [Store icon](assets/icons/icon-128.png)
+- [Small promotional image, 440 × 280](assets/store/promo-small-440x280.png)
+- [Screenshot 1, 1280 × 800 — current model list](assets/store/screenshot-1-settings-1280x800.png)
+- [Screenshot 2, 1280 × 800 — Auto and saved thinking level](assets/store/screenshot-2-applied-1280x800.png)
 
-Editable SVG sources for the icon and screenshots are included under `assets/icons` and `assets/store/source`.
+Editable SVG sources for the icon, screenshots, and promotional tile are included under `assets/icons` and `assets/store/source`.
 
 To regenerate all transparent icon sizes (16, 32, 48, and 128 px) from the SVG, run `python assets/icons/render-icons.py`. The script also updates the icon copies used by the screenshot sources.
 
-Both screenshots show the current extension popup, rendered directly from `popup.html`, `popup.css`, and `popup.js`: light theme with Hydrogen selected, and dark theme with Argon selected. The promotional image and icon do not depend on the model list.
+Both screenshots use the current popup with an example Gemini catalog. The light screenshot shows 4 Neon and High. The dark screenshot shows Auto with Medium saved. The small promotional tile uses the extension icon and a model selection motif.
 
-To regenerate the screenshots after changing the popup, run:
+To regenerate the screenshots and the promotional tile, run:
 
 ```powershell
 python assets/store/source/render-store-images.py
