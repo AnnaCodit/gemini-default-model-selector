@@ -5,6 +5,11 @@
   const SAVE_SETTINGS_MESSAGE = "GEMINI_SAVE_SETTINGS";
   const OPEN_GEMINI_MESSAGE = "GEMINI_OPEN_NEW_TAB";
   const OPEN_GEMINI_COMMAND = "open-gemini";
+  const REVIEW_URL = "https://chromewebstore.google.com/detail/kmklgjnaichjgojddjoecifjhphjgefp/reviews";
+  const REVIEW_PROMPT_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
+  const reviewPromptDebug = core.REVIEW_PROMPT_DEBUG === 1;
+  const reviewPrompt = document.querySelector("#review-prompt");
+  const reviewStatus = document.querySelector("#review-status");
   const settingsPanel = document.querySelector("#settings-panel");
   const modelOptions = document.querySelector("#model-options");
   const thinkingSection = document.querySelector("#thinking-section");
@@ -24,12 +29,62 @@
   let modelCatalog = [];
   let currentGeminiModel = null;
   let catalogRequest = 0;
+  let savingReviewChoice = false;
   settingsPanel.inert = true;
 
   function setStatus(message, kind = "info") {
     status.textContent = message;
     status.dataset.kind = kind;
   }
+
+  async function loadReviewPrompt() {
+    if (reviewPromptDebug) {
+      reviewPrompt.hidden = false;
+      return;
+    }
+
+    const nextAtKey = core.REVIEW_PROMPT_NEXT_AT_KEY;
+    try {
+      const stored = await chrome.storage.local.get([nextAtKey, "reviewPromptDismissed"]);
+      const nextAt = stored[nextAtKey];
+      reviewPrompt.hidden = Boolean(stored.reviewPromptDismissed)
+        || !Number.isFinite(nextAt) || Date.now() < nextAt;
+    } catch {
+      reviewPrompt.hidden = true;
+    }
+  }
+
+  reviewPrompt.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-review-action]");
+    if (!button || reviewPrompt.hidden || savingReviewChoice) return;
+
+    savingReviewChoice = true;
+    const action = button.dataset.reviewAction;
+    try {
+      if (!reviewPromptDebug) {
+        await chrome.storage.local.set(action === "later"
+          ? { [core.REVIEW_PROMPT_NEXT_AT_KEY]: Date.now() + REVIEW_PROMPT_SNOOZE_MS }
+          : { reviewPromptDismissed: true });
+      }
+    } catch {
+      reviewStatus.textContent = "Could not save your choice. Try again.";
+      return;
+    } finally {
+      savingReviewChoice = false;
+    }
+
+    const focusWasInPrompt = reviewPrompt.contains(document.activeElement);
+    reviewPrompt.hidden = true;
+    if (focusWasInPrompt) document.querySelector("#model-list-title").focus();
+
+    if (action === "rate") {
+      try {
+        await chrome.tabs.create({ url: REVIEW_URL });
+      } catch {
+        setStatus("Could not open the Chrome Web Store.", "error");
+      }
+    }
+  });
 
   function setGeminiLinkStatus() {
     const link = document.createElement("a");
@@ -276,4 +331,5 @@
 
   checkGeminiSiteAccess();
   updateShortcutLabel();
+  loadReviewPrompt();
 })();

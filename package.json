@@ -1,6 +1,6 @@
 {
   "name": "gemini-default-model-selector",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "description": "Chrome extension for keeping a preferred Gemini model and thinking level.",
   "scripts": {

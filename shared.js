@@ -1,6 +1,9 @@
 (function initializeSharedApi(globalScope) {
   "use strict";
 
+  // 1 previews the review prompt immediately. Set to 0 before publishing.
+  const REVIEW_PROMPT_DEBUG = 0;
+
   const MODEL_OPTIONS = Object.freeze([
     Object.freeze({
       id: "flash-lite-3.5",
@@ -51,6 +54,7 @@
   const THINKING_LEVELS = Object.freeze(["low", "medium", "high"]);
   const STORAGE_KEYS = Object.freeze(["model", "thinkingLevel", "extendedThinking"]);
   const MODEL_CATALOG_KEY = "modelCatalog";
+  const REVIEW_PROMPT_NEXT_AT_KEY = "reviewPromptNextAt";
   const READ_MODEL_CATALOG_MESSAGE = "GEMINI_READ_MODEL_CATALOG";
   // Gemini exposes this option without a thinking menu, including in localized UIs.
   const AUTO_MODE_ID = "8c46e95b1a07cecc";
@@ -280,6 +284,8 @@
     AUTO_MODE_ID,
     DEFAULT_SETTINGS,
     MODEL_CATALOG_KEY,
+    REVIEW_PROMPT_DEBUG,
+    REVIEW_PROMPT_NEXT_AT_KEY,
     MODEL_OPTIONS,
     READ_MODEL_CATALOG_MESSAGE,
     STORAGE_KEYS,

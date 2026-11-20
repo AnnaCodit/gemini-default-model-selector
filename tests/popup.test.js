@@ -27,10 +27,17 @@ function createPopupMock(initialStorage = {}, options = {}) {
   const permissionQueries = [];
   const tabCreates = [];
   const models = [];
+  const local = { ...options.local };
   let storageListener;
 
   // Simple DOM simulation
   const elements = {
+    "#review-prompt": {
+      hidden: true,
+      addEventListener(_type, cb) { this.click = cb; },
+      contains() { return false; }
+    },
+    "#review-status": { textContent: "" },
     "#settings-panel": {
       listeners: {},
       addEventListener(type, cb) {
@@ -122,7 +129,12 @@ function createPopupMock(initialStorage = {}, options = {}) {
     storage: {
       local: {
         get(_key, cb) {
-          cb({ modelCatalog: options.catalog ?? fixtureCatalog });
+          if (cb) return cb({ modelCatalog: options.catalog ?? fixtureCatalog });
+          return Promise.resolve({ ...local });
+        },
+        async set(items) {
+          if (options.localWriteError) throw new Error("storage unavailable");
+          Object.assign(local, items);
         }
       },
       onChanged: { addListener(cb) { storageListener = cb; } },
@@ -168,16 +180,28 @@ function createPopupMock(initialStorage = {}, options = {}) {
     document,
     setTimeout,
     clearTimeout,
-    console
+    console,
+    Date: options.Date ?? Date
   });
 
   vm.runInContext(sharedSource, context);
+  context.GeminiDefaultModelCore = {
+    ...context.GeminiDefaultModelCore,
+    REVIEW_PROMPT_DEBUG: options.reviewPromptDebug ?? 0
+  };
   vm.runInContext(popupSource, context);
 
   return {
     getStored: () => stored,
     models,
     thinkings,
+    local,
+    reviewPrompt: elements["#review-prompt"],
+    reviewStatus: elements["#review-status"],
+    reviewAction(action) {
+      const button = { dataset: { reviewAction: action } };
+      return elements["#review-prompt"].click({ target: { closest: () => button } });
+    },
     thinkingSection: elements["#thinking-section"],
     changeCatalog(value) { storageListener({ modelCatalog: { newValue: value } }, "local"); },
     panel: elements["#settings-panel"],
@@ -197,6 +221,69 @@ function createPopupMock(initialStorage = {}, options = {}) {
     }
   };
 }
+
+test("shows the review reminder when due and snoozes for exactly one week", async () => {
+  const week = 7 * 24 * 60 * 60 * 1000;
+  const due = 2 * week;
+  let now = due - 1;
+  const clock = { now: () => now };
+  async function open(local) {
+    const mock = createPopupMock({}, { local, Date: clock });
+    await new Promise((resolve) => setImmediate(resolve));
+    return mock;
+  }
+
+  const early = await open({ reviewPromptNextAt: due });
+  assert.equal(early.reviewPrompt.hidden, true);
+  now = due;
+  const duePrompt = await open(early.local);
+  assert.equal(duePrompt.reviewPrompt.hidden, false);
+  await duePrompt.reviewAction("later");
+  assert.equal(duePrompt.reviewPrompt.hidden, true);
+  assert.equal(duePrompt.local.reviewPromptNextAt, due + week);
+  assert.equal(duePrompt.tabCreates.length, 0);
+  now = due + week - 1;
+  assert.equal((await open(duePrompt.local)).reviewPrompt.hidden, true);
+  now += 1;
+  assert.equal((await open(duePrompt.local)).reviewPrompt.hidden, false);
+});
+
+test("rating or dismissing permanently hides the review reminder", async () => {
+  for (const action of ["rate", "dismiss"]) {
+    const mock = createPopupMock({}, { local: { reviewPromptNextAt: 0 } });
+    await waitFor(() => !mock.reviewPrompt.hidden);
+    await mock.reviewAction(action);
+    assert.equal(mock.reviewPrompt.hidden, true);
+    assert.equal(mock.local.reviewPromptDismissed, true);
+    assert.deepEqual(mock.tabCreates.map(({ url }) => url), action === "rate"
+      ? ["https://chromewebstore.google.com/detail/kmklgjnaichjgojddjoecifjhphjgefp/reviews"] : []);
+
+    const reopened = createPopupMock({}, { local: mock.local });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(reopened.reviewPrompt.hidden, true);
+  }
+});
+
+test("keeps the review reminder available if saving the choice fails", async () => {
+  const mock = createPopupMock({}, { local: { reviewPromptNextAt: 0 }, localWriteError: true });
+  await waitFor(() => !mock.reviewPrompt.hidden);
+  await mock.reviewAction("rate");
+  assert.equal(mock.reviewPrompt.hidden, false);
+  assert.equal(mock.reviewStatus.textContent, "Could not save your choice. Try again.");
+  assert.equal(mock.tabCreates.length, 0);
+});
+
+test("debug review prompt shows immediately and supports clicks without saving choices", async () => {
+  const local = { reviewPromptNextAt: Date.now() + 60_000, reviewPromptDismissed: true };
+  for (const action of ["later", "dismiss", "rate"]) {
+    const mock = createPopupMock({}, { local, reviewPromptDebug: 1, localWriteError: true });
+    assert.equal(mock.reviewPrompt.hidden, false);
+    await mock.reviewAction(action);
+    assert.equal(mock.reviewPrompt.hidden, true);
+    assert.deepEqual(mock.local, local);
+    assert.equal(mock.tabCreates.length, action === "rate" ? 1 : 0);
+  }
+});
 
 async function waitFor(predicate) {
   for (let attempt = 0; attempt < 20; attempt += 1) {

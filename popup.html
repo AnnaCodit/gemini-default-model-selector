@@ -16,6 +16,19 @@
         <h1>Gemini Default <br>Model Selector</h1>
       </div>
     </header>
+    <section id="review-prompt" class="review-prompt" hidden>
+      <button class="review-stars" type="button" data-review-action="rate"
+        aria-label="Rate the extension in the Chrome Web Store">⭐⭐⭐⭐⭐</button>
+      <p>Like this extension? A quick review helps others discover it.</p>
+      <div class="review-actions">
+        <button class="review-rate" type="button" data-review-action="rate">Rate</button>
+        <button type="button" data-review-action="dismiss">Already rated</button>
+        <button type="button" data-review-action="later">Remind me later</button>
+      </div>
+      <button class="review-close" type="button" data-review-action="dismiss"
+        aria-label="Dismiss review reminder">×</button>
+      <p id="review-status" class="review-status" role="status"></p>
+    </section>
     <section id="site-access-warning" class="site-access-warning" hidden aria-label="Gemini site access warning">
       <p> Automatic selection is off. Allow permanent access to gemini.google.com in Chrome. </p>
       <button id="site-access-settings" class="site-access-settings" type="button"> Open site access settings 👈
@@ -23,7 +36,7 @@
     </section>
     <section id="settings-panel">
       <fieldset class="model-list">
-        <legend>Choose the model</legend>
+        <legend id="model-list-title" tabindex="-1">Choose the model</legend>
         <div id="model-options"></div>
       </fieldset>
       <fieldset id="thinking-section" class="thinking-section">

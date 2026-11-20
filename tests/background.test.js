@@ -20,6 +20,8 @@ function loadBackground(
   let remainingInitialSendFailures = options.initialSendFailures || 0;
   let commandListener = null;
   let messageListener = null;
+  let installedListener = null;
+  const local = { ...options.local };
   const storageWriteReleases = [];
   const storageReadReleases = [];
   const applyReleases = [];
@@ -33,6 +35,9 @@ function loadBackground(
       }
     },
     runtime: {
+      onInstalled: {
+        addListener(listener) { installedListener = listener; }
+      },
       onUpdateAvailable: {
         addListener() {}
       },
@@ -43,6 +48,10 @@ function loadBackground(
       }
     },
     storage: {
+      local: {
+        async get(key) { return { [key]: local[key] }; },
+        async set(items) { Object.assign(local, items); }
+      },
       sync: {
         async get(keys) {
           const snapshot = { ...currentStored };
@@ -96,7 +105,9 @@ function loadBackground(
     }
   };
 
-  const context = vm.createContext({ chrome, console, setTimeout, clearTimeout });
+  const context = vm.createContext({
+    chrome, console, setTimeout, clearTimeout, Date: options.Date ?? Date
+  });
   context.importScripts = (name) => {
     assert.equal(name, "shared.js");
     vm.runInContext(sharedSource, context);
@@ -106,6 +117,8 @@ function loadBackground(
     calls,
     commandListener,
     messageListener,
+    installedListener,
+    local,
     getStored: () => currentStored,
     setActiveTab(tabId) { activeTabId = tabId; },
     releaseStorageRead(index) { storageReadReleases[index]?.(); },
@@ -115,6 +128,22 @@ function loadBackground(
     }
   };
 }
+
+test("schedules a review two weeks after installation or the first update with the reminder", async () => {
+  const day = 24 * 60 * 60 * 1000;
+  let now = 30 * day;
+  for (const reason of ["install", "update"]) {
+    const mock = loadBackground({}, { Date: { now: () => now } });
+    await mock.installedListener({ reason: "chrome_update" });
+    assert.equal(mock.local.reviewPromptNextAt, undefined);
+    const firstPrompt = now + 14 * day;
+    await mock.installedListener({ reason });
+    assert.equal(mock.local.reviewPromptNextAt, firstPrompt);
+    now += day;
+    await mock.installedListener({ reason: "update" });
+    assert.equal(mock.local.reviewPromptNextAt, firstPrompt);
+  }
+});
 
 function sendRuntimeMessage(listener, message) {
   return new Promise((resolve) => {

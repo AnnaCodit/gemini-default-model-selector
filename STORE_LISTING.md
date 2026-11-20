@@ -25,7 +25,7 @@ Open Gemini once to load your model list, then click the extension icon and choo
 
 PRIVACY
 
-The model list stays in your browser. Chrome can sync your preferences across devices when Chrome Sync is enabled. The extension does not collect prompts, chat history, or analytics.
+The model list and your review reminder preference stay in your browser. Chrome can sync your model and thinking preferences across devices when Chrome Sync is enabled. The extension does not collect prompts, chat history, or analytics.
 
 Gemini Default Model Selector is an independent extension. Gemini is a trademark of Google LLC.
 
@@ -35,12 +35,12 @@ Remember and apply the user's preferred Gemini model and thinking level on gemin
 
 ## Permission justification
 
-- `storage`: Stores model and thinking preferences in Chrome Sync and caches the model list locally.
+- `storage`: Stores model and thinking preferences in Chrome Sync and keeps the model list and review reminder preference locally.
 - `https://gemini.google.com/*`: Reads and operates Gemini's model controls only on Gemini pages.
 
 ## Privacy disclosure
 
-The extension does not collect, sell, or transmit personal data. It uses `chrome.storage.sync` for model and thinking preferences and local browser storage for the list of model names, identifiers, and availability shown in the Gemini menu.
+The extension does not collect, sell, or transmit personal data. It uses `chrome.storage.sync` for model and thinking preferences and local browser storage for the Gemini model list and review reminder timing and dismissal.
 
 ## Store images
 

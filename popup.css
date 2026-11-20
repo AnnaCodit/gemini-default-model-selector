@@ -137,6 +137,90 @@ legend {
   text-decoration: underline;
 }
 
+.review-prompt {
+  position: relative;
+  margin-bottom: 14px;
+  padding: 9px 10px 10px;
+  border: 1px solid #d4defb;
+  border-radius: 10px;
+  color: #28334e;
+  background: #edf2ff;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.review-prompt button {
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 5px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.review-prompt button:hover {
+  background: rgb(82 111 243 / 14%);
+}
+
+.review-prompt button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+
+.review-prompt .review-stars {
+  margin-bottom: 3px;
+  padding-inline: 0;
+  font-size: 16px;
+  letter-spacing: 1px;
+}
+
+.review-prompt .review-stars:hover {
+  background: transparent;
+}
+
+.review-prompt .review-stars:focus-visible {
+  outline: none;
+  text-decoration: underline 2px;
+  text-underline-offset: 2px;
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.review-prompt .review-rate {
+  padding-inline: 9px;
+  color: #fff;
+  background: #405bc4;
+}
+
+.review-prompt .review-rate:hover {
+  background: #354eae;
+}
+
+.review-prompt .review-rate:focus-visible {
+  outline-color: #405bc4;
+}
+
+.review-prompt .review-close {
+  position: absolute;
+  inset: 6px 6px auto auto;
+  min-width: 24px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.review-status:not(:empty) {
+  margin-top: 6px;
+}
+
 .site-access-warning {
   display: grid;
   gap: 7px;
@@ -403,6 +487,16 @@ legend {
 
   .site-access-settings {
     color: #9bb0ff;
+  }
+
+  .review-prompt {
+    border-color: #3a476b;
+    color: #e5ebff;
+    background: #242d45;
+  }
+
+  .review-prompt .review-rate:focus-visible {
+    outline-color: #9bb0ff;
   }
 
   .site-access-warning {

@@ -1,6 +1,6 @@
 # Privacy Policy for Gemini Default Model Selector
 
-**Last Updated:** November 19, 2026
+**Last Updated:** November 21, 2026
 
 ## 1. Overview
 This Privacy Policy describes how the **Gemini Default Model Selector** Chrome Extension ("Extension", "we", "us", or "our") handles your data. We are committed to protecting user privacy. This Extension is designed to operate locally on your browser with strict data minimization principles.
@@ -17,10 +17,12 @@ These preferences are saved using Chrome's native `chrome.storage.sync` API. If 
 
 The Extension also caches model names, identifiers and availability as shown in the Gemini model menu. This cache stays in the local extension storage in your browser and is used to show the list of models in the popup.
 
+The Extension stores when to show the review reminder and whether you dismissed it in local extension storage. These values stay in your browser.
+
 ## 3. Extension Permissions
 The Extension requests the following browser permissions strictly for core functional purposes:
 
-* **`storage`**: Stores your model preferences and the local list of models.
+* **`storage`**: Stores your model preferences, the local list of models, and your review reminder preference.
 * **`https://gemini.google.com/*`**: Reads Gemini's model menu and applies your saved model settings automatically. It does **not** read, save, track, or transmit your conversation history, prompts, or account information.
 
 ## 4. Data Sharing and Selling

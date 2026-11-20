@@ -12,6 +12,7 @@ importScripts("shared.js");
   const GEMINI_URL = "https://gemini.google.com/app";
   const CONNECTION_TIMEOUT_MS = 30_000;
   const CONNECTION_RETRY_MS = 250;
+  const REVIEW_PROMPT_FIRST_DELAY_MS = 14 * 24 * 60 * 60 * 1000;
   let storageWriteQueue = Promise.resolve();
   let latestSaveSequence = 0;
 
@@ -200,6 +201,21 @@ importScripts("shared.js");
         });
       });
     return true;
+  });
+
+  chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+    if (reason !== "install" && reason !== "update") return;
+
+    const nextAtKey = core.REVIEW_PROMPT_NEXT_AT_KEY;
+    const firstPromptAt = Date.now() + REVIEW_PROMPT_FIRST_DELAY_MS;
+    try {
+      const stored = await chrome.storage.local.get(nextAtKey);
+      if (stored[nextAtKey] === undefined) {
+        await chrome.storage.local.set({ [nextAtKey]: firstPromptAt });
+      }
+    } catch {
+      console.error("[Gemini Default Model Selector] Could not schedule the review prompt.");
+    }
   });
 
   chrome.runtime.onUpdateAvailable.addListener(() => {
