@@ -1,0 +1,218 @@
+{
+  "extension_name": {
+    "message": "Выбор модели по умолчанию для Gemini"
+  },
+  "extension_description": {
+    "message": "Выберите модель и уровень рассуждений по умолчанию. Список моделей обновляется из меню Gemini."
+  },
+  "action_title": {
+    "message": "Модель Gemini по умолчанию"
+  },
+  "command_open_gemini": {
+    "message": "Открыть Gemini в новой вкладке"
+  },
+  "popup_language": {
+    "message": "ru"
+  },
+  "popup_choose_model": {
+    "message": "Выберите модель"
+  },
+  "popup_auto_mode": {
+    "message": "Авто"
+  },
+  "popup_models_empty": {
+    "message": "Откройте Gemini, чтобы загрузить список доступных моделей."
+  },
+  "popup_model_unavailable": {
+    "message": "Недоступна"
+  },
+  "popup_thinking_level": {
+    "message": "Уровень рассуждений"
+  },
+  "popup_thinking_level_saved": {
+    "message": "Уровень рассуждений (сохранён)"
+  },
+  "popup_thinking_low": {
+    "message": "Низкий"
+  },
+  "popup_thinking_medium": {
+    "message": "Средний"
+  },
+  "popup_thinking_high": {
+    "message": "Высокий"
+  },
+  "popup_review_prompt": {
+    "message": "Нравится расширение? Ваш отзыв поможет другим его найти."
+  },
+  "popup_review_rate": {
+    "message": "Оценить"
+  },
+  "popup_review_rate_aria": {
+    "message": "Оценить расширение в Интернет-магазине Chrome"
+  },
+  "popup_review_rated": {
+    "message": "Уже оценено"
+  },
+  "popup_review_later": {
+    "message": "Напомнить позже"
+  },
+  "popup_review_dismiss_aria": {
+    "message": "Закрыть напоминание об отзыве"
+  },
+  "popup_review_save_failed": {
+    "message": "Не удалось сохранить выбор. Попробуйте ещё раз."
+  },
+  "popup_review_open_failed": {
+    "message": "Не удалось открыть Интернет-магазин Chrome."
+  },
+  "popup_site_access_aria": {
+    "message": "Предупреждение о доступе к сайту Gemini"
+  },
+  "popup_site_access_warning": {
+    "message": "Автоматический выбор отключён. Разрешите расширению постоянный доступ к gemini.google.com в Chrome."
+  },
+  "popup_site_access_settings": {
+    "message": "Открыть настройки доступа к сайту 👈"
+  },
+  "popup_site_access_failed": {
+    "message": "Не удалось открыть настройки доступа расширения к сайту."
+  },
+  "popup_shortcut_aria": {
+    "message": "Быстрое открытие Gemini"
+  },
+  "popup_open_gemini": {
+    "message": "Открыть Gemini"
+  },
+  "popup_change_shortcut": {
+    "message": "Изменить"
+  },
+  "popup_change_shortcut_aria": {
+    "message": "Изменить сочетание клавиш для открытия Gemini"
+  },
+  "popup_hotkey": {
+    "message": "($SHORTCUT$)",
+    "placeholders": {
+      "shortcut": {
+        "content": "$1",
+        "example": "Alt+G"
+      }
+    }
+  },
+  "popup_hotkey_not_set": {
+    "message": "(сочетание не задано)"
+  },
+  "popup_hotkey_unavailable": {
+    "message": "(сочетание недоступно)"
+  },
+  "popup_shortcut_settings_fallback": {
+    "message": "Чтобы изменить сочетание клавиш, откройте $SETTINGS_URL$.",
+    "placeholders": {
+      "settings_url": {
+        "content": "$1",
+        "example": "chrome://extensions/shortcuts"
+      }
+    }
+  },
+  "popup_loading": {
+    "message": "Загрузка настроек…"
+  },
+  "popup_autosave": {
+    "message": "Изменения сохраняются автоматически"
+  },
+  "popup_saving": {
+    "message": "Сохранение…"
+  },
+  "popup_saved": {
+    "message": "Сохранено"
+  },
+  "popup_saved_open_gemini": {
+    "message": "Сохранено. Откройте или обновите $GEMINI_LINK$, чтобы применить настройки.",
+    "placeholders": {
+      "gemini_link": {
+        "content": "$1",
+        "example": "Gemini"
+      }
+    }
+  },
+  "popup_saved_gemini_loading": {
+    "message": "Сохранено. Gemini ещё загружается."
+  },
+  "popup_saved_no_active_tab": {
+    "message": "Настройки сохранены, но активную вкладку найти не удалось."
+  },
+  "popup_saved_not_applied": {
+    "message": "Настройки сохранены, но пока не применены."
+  },
+  "popup_save_failed": {
+    "message": "Не удалось сохранить настройки."
+  },
+  "popup_save_failed_retry": {
+    "message": "Не удалось сохранить настройки. Попробуйте открыть расширение заново."
+  },
+  "popup_save_or_apply_failed": {
+    "message": "Не удалось сохранить или применить настройки."
+  },
+  "popup_opening_gemini": {
+    "message": "Открываем Gemini…"
+  },
+  "popup_open_gemini_failed": {
+    "message": "Не удалось открыть Gemini."
+  },
+  "popup_gemini_not_ready": {
+    "message": "Gemini ещё не готов. Попробуйте снова после загрузки."
+  },
+  "popup_apply_failed": {
+    "message": "Не удалось применить настройки в Gemini."
+  },
+  "popup_apply_saved_model_unavailable": {
+    "message": "Сохранённая модель недоступна в этом меню Gemini."
+  },
+  "popup_apply_model_unavailable": {
+    "message": "Модель $MODEL$ недоступна для этого аккаунта. Выберите другую модель.",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_model_not_found": {
+    "message": "Не удалось найти модель $MODEL$ в меню.",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_model_not_confirmed": {
+    "message": "Gemini не подтвердил выбор модели $MODEL$.",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_thinking_unavailable": {
+    "message": "Выбранный уровень рассуждений недоступен или его не удалось проверить."
+  },
+  "popup_apply_thinking_not_confirmed": {
+    "message": "Gemini не подтвердил выбранный уровень рассуждений."
+  },
+  "popup_apply_thinking_menu_open": {
+    "message": "Gemini не закрыл подменю уровня рассуждений."
+  },
+  "popup_apply_model_menu_open": {
+    "message": "Gemini не закрыл меню моделей."
+  },
+  "popup_apply_settings_not_confirmed": {
+    "message": "Gemini не подтвердил итоговые настройки модели."
+  },
+  "popup_debug_language": {
+    "message": "Язык предпросмотра"
+  },
+  "popup_debug_browser_language": {
+    "message": "Язык браузера"
+  }
+}

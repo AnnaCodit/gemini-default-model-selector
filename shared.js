@@ -1,6 +1,9 @@
 (function initializeSharedApi(globalScope) {
   "use strict";
 
+  // 1 enables developer controls in the popup. Set to 0 before publishing.
+  const DEBUG = 0;
+
   // 1 previews the review prompt immediately. Set to 0 before publishing.
   const REVIEW_PROMPT_DEBUG = 0;
 
@@ -282,6 +285,7 @@
 
   globalScope.GeminiDefaultModelCore = Object.freeze({
     AUTO_MODE_ID,
+    DEBUG,
     DEFAULT_SETTINGS,
     MODEL_CATALOG_KEY,
     REVIEW_PROMPT_DEBUG,

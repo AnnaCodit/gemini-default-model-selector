@@ -435,7 +435,7 @@ test("reports storage failures without attempting an apply", async () => {
   });
 
   assert.deepEqual(toPlain(response), {
-    ok: false, saved: false, error: "Could not save the settings."
+    ok: false, saved: false, messageKey: "popup_save_failed"
   });
   assert.equal(mock.calls.some(([name]) => name === "sendMessage"), false);
 });
@@ -450,7 +450,22 @@ test("returns the refresh link when active-tab messaging fails", async () => {
   assert.equal(response.ok, false);
   assert.equal(response.saved, true);
   assert.equal(response.showGeminiLink, true);
-  assert.equal(response.error, "Saved. Open or refresh Gemini to apply it.");
   assert.equal(mock.getStored().thinkingLevel, "high");
+});
+
+test("forwards the Gemini failure code and model name to the popup", async () => {
+  const failure = {
+    ok: false, messageKey: "popup_apply_model_unavailable", substitution: "4 Carbon"
+  };
+  const mock = loadBackground({}, { applyResult: failure });
+
+  const saved = await sendRuntimeMessage(mock.messageListener, {
+    type: "GEMINI_SAVE_SETTINGS",
+    settings: { model: "carbon-4", thinkingLevel: "medium" }
+  });
+  assert.deepEqual(toPlain(saved), { ...failure, saved: true });
+
+  const opened = await sendRuntimeMessage(mock.messageListener, { type: "GEMINI_OPEN_NEW_TAB" });
+  assert.deepEqual(toPlain(opened), failure);
 });
 

@@ -1,0 +1,218 @@
+{
+  "extension_name": {
+    "message": "Selector de modelo predeterminado para Gemini"
+  },
+  "extension_description": {
+    "message": "Elige el modelo y el nivel de razonamiento predeterminados en Gemini. La lista de modelos se actualiza desde su menú."
+  },
+  "action_title": {
+    "message": "Modelo predeterminado de Gemini"
+  },
+  "command_open_gemini": {
+    "message": "Abrir Gemini en una pestaña nueva"
+  },
+  "popup_language": {
+    "message": "es"
+  },
+  "popup_choose_model": {
+    "message": "Elige un modelo"
+  },
+  "popup_auto_mode": {
+    "message": "Automático"
+  },
+  "popup_models_empty": {
+    "message": "Abre Gemini para cargar los modelos disponibles."
+  },
+  "popup_model_unavailable": {
+    "message": "No disponible"
+  },
+  "popup_thinking_level": {
+    "message": "Nivel de razonamiento"
+  },
+  "popup_thinking_level_saved": {
+    "message": "Nivel de razonamiento (guardado)"
+  },
+  "popup_thinking_low": {
+    "message": "Bajo"
+  },
+  "popup_thinking_medium": {
+    "message": "Medio"
+  },
+  "popup_thinking_high": {
+    "message": "Alto"
+  },
+  "popup_review_prompt": {
+    "message": "¿Te gusta la extensión? Una reseña breve ayuda a que más personas la descubran."
+  },
+  "popup_review_rate": {
+    "message": "Valorar"
+  },
+  "popup_review_rate_aria": {
+    "message": "Valorar la extensión en Chrome Web Store"
+  },
+  "popup_review_rated": {
+    "message": "Ya la valoré"
+  },
+  "popup_review_later": {
+    "message": "Recordarme más tarde"
+  },
+  "popup_review_dismiss_aria": {
+    "message": "Descartar el recordatorio de valoración"
+  },
+  "popup_review_save_failed": {
+    "message": "No se pudo guardar tu elección. Inténtalo de nuevo."
+  },
+  "popup_review_open_failed": {
+    "message": "No se pudo abrir Chrome Web Store."
+  },
+  "popup_site_access_aria": {
+    "message": "Aviso de acceso al sitio de Gemini"
+  },
+  "popup_site_access_warning": {
+    "message": "La selección automática está desactivada. Permite el acceso permanente a gemini.google.com en Chrome."
+  },
+  "popup_site_access_settings": {
+    "message": "Abrir los ajustes de acceso al sitio 👈"
+  },
+  "popup_site_access_failed": {
+    "message": "No se pudieron abrir los ajustes de acceso de la extensión."
+  },
+  "popup_shortcut_aria": {
+    "message": "Atajo para abrir Gemini"
+  },
+  "popup_open_gemini": {
+    "message": "Abrir Gemini"
+  },
+  "popup_change_shortcut": {
+    "message": "Cambiar"
+  },
+  "popup_change_shortcut_aria": {
+    "message": "Cambiar el atajo de teclado para abrir Gemini"
+  },
+  "popup_hotkey": {
+    "message": "($SHORTCUT$)",
+    "placeholders": {
+      "shortcut": {
+        "content": "$1",
+        "example": "Alt+G"
+      }
+    }
+  },
+  "popup_hotkey_not_set": {
+    "message": "(sin atajo)"
+  },
+  "popup_hotkey_unavailable": {
+    "message": "(atajo no disponible)"
+  },
+  "popup_shortcut_settings_fallback": {
+    "message": "Abre $SETTINGS_URL$ para cambiar el atajo.",
+    "placeholders": {
+      "settings_url": {
+        "content": "$1",
+        "example": "chrome://extensions/shortcuts"
+      }
+    }
+  },
+  "popup_loading": {
+    "message": "Cargando los ajustes…"
+  },
+  "popup_autosave": {
+    "message": "Los cambios se guardan automáticamente"
+  },
+  "popup_saving": {
+    "message": "Guardando…"
+  },
+  "popup_saved": {
+    "message": "Guardado"
+  },
+  "popup_saved_open_gemini": {
+    "message": "Guardado. Abre o recarga $GEMINI_LINK$ para aplicar los cambios.",
+    "placeholders": {
+      "gemini_link": {
+        "content": "$1",
+        "example": "Gemini"
+      }
+    }
+  },
+  "popup_saved_gemini_loading": {
+    "message": "Guardado. Gemini todavía se está cargando."
+  },
+  "popup_saved_no_active_tab": {
+    "message": "Los ajustes se guardaron, pero no se encontró la pestaña activa."
+  },
+  "popup_saved_not_applied": {
+    "message": "Los ajustes se guardaron, pero aún no se han aplicado."
+  },
+  "popup_save_failed": {
+    "message": "No se pudieron guardar los ajustes."
+  },
+  "popup_save_failed_retry": {
+    "message": "No se pudieron guardar los ajustes. Prueba a abrir la extensión de nuevo."
+  },
+  "popup_save_or_apply_failed": {
+    "message": "No se pudieron guardar o aplicar los ajustes."
+  },
+  "popup_opening_gemini": {
+    "message": "Abriendo Gemini…"
+  },
+  "popup_open_gemini_failed": {
+    "message": "No se pudo abrir Gemini."
+  },
+  "popup_gemini_not_ready": {
+    "message": "Gemini aún no está listo. Inténtalo de nuevo cuando termine de cargar."
+  },
+  "popup_apply_failed": {
+    "message": "No se pudieron aplicar los ajustes en Gemini."
+  },
+  "popup_apply_saved_model_unavailable": {
+    "message": "El modelo guardado no está disponible en este menú de Gemini."
+  },
+  "popup_apply_model_unavailable": {
+    "message": "$MODEL$ no está disponible para esta cuenta. Elige otro modelo.",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_model_not_found": {
+    "message": "No se encontró el modelo $MODEL$ en el menú.",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_model_not_confirmed": {
+    "message": "Gemini no confirmó la selección del modelo $MODEL$.",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_thinking_unavailable": {
+    "message": "El nivel de razonamiento elegido no está disponible o no se pudo verificar."
+  },
+  "popup_apply_thinking_not_confirmed": {
+    "message": "Gemini no confirmó el nivel de razonamiento elegido."
+  },
+  "popup_apply_thinking_menu_open": {
+    "message": "Gemini no cerró el submenú de razonamiento."
+  },
+  "popup_apply_model_menu_open": {
+    "message": "Gemini no cerró el menú de modelos."
+  },
+  "popup_apply_settings_not_confirmed": {
+    "message": "Gemini no confirmó los ajustes finales del modelo."
+  },
+  "popup_debug_language": {
+    "message": "Idioma de vista previa"
+  },
+  "popup_debug_browser_language": {
+    "message": "Idioma del navegador"
+  }
+}

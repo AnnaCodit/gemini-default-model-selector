@@ -89,13 +89,9 @@ importScripts("shared.js");
     if (sequence !== latestSaveSequence) {
       return { ok: true, applied: false, stale: true };
     }
-    if (activeTabResult.failed) {
-      return { ok: false, error: "Saved, but the active tab was not found." };
-    }
-
     const { activeTab } = activeTabResult;
-    if (!activeTab?.id) {
-      return { ok: false, error: "Saved, but the active tab was not found." };
+    if (activeTabResult.failed || !activeTab?.id) {
+      return { ok: false, messageKey: "popup_saved_no_active_tab" };
     }
 
     try {
@@ -105,11 +101,7 @@ importScripts("shared.js");
         focusComposer: true
       });
     } catch {
-      return {
-        ok: false,
-        error: "Saved. Open or refresh Gemini to apply it.",
-        showGeminiLink: true
-      };
+      return { ok: false, showGeminiLink: true };
     }
   }
 
@@ -120,7 +112,7 @@ importScripts("shared.js");
     try {
       await enqueueStorageWrite(normalizedSettings);
     } catch {
-      return { ok: false, saved: false, error: "Could not save the settings." };
+      return { ok: false, saved: false, messageKey: "popup_save_failed" };
     }
 
     if (sequence !== latestSaveSequence) {
@@ -145,18 +137,26 @@ importScripts("shared.js");
       throw new Error("Could not open a Gemini tab.");
     }
 
-    const result = await sendMessageWhenReady(tab.id, async () => ({
-      type: APPLY_MESSAGE,
-      settings: await readLatestSettings(),
-      focusComposer: true,
-      waitForUi: true,
-      initialApplication: true
-    }));
+    let result;
+    try {
+      result = await sendMessageWhenReady(tab.id, async () => ({
+        type: APPLY_MESSAGE,
+        settings: await readLatestSettings(),
+        focusComposer: true,
+        waitForUi: true,
+        initialApplication: true
+      }));
+    } catch (error) {
+      console.error("[Gemini Default Model Selector]", error.message);
+      return { ok: false, messageKey: "popup_gemini_not_ready" };
+    }
 
     if (!result?.ok || !result.applied) {
-      throw new Error(
-        result?.error || result?.reason || "The Gemini interface is not ready."
-      );
+      return {
+        ok: false,
+        messageKey: result?.messageKey || "popup_gemini_not_ready",
+        substitution: result?.substitution
+      };
     }
 
     return { ok: true, tabId: tab.id };
@@ -167,39 +167,37 @@ importScripts("shared.js");
       return undefined;
     }
 
-    return openGemini().catch((error) => {
-      console.error("[Gemini Default Model Selector]", error.message);
-      return { ok: false, error: error.message };
-    });
+    return (async () => {
+      try {
+        const result = await openGemini();
+        if (!result.ok) console.error("[Gemini Default Model Selector]", result.messageKey);
+        return result;
+      } catch (error) {
+        console.error("[Gemini Default Model Selector]", error.message);
+        return { ok: false, messageKey: "popup_open_gemini_failed" };
+      }
+    })();
   });
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === SAVE_SETTINGS_MESSAGE) {
-      const activeTabRequest = captureActiveTab();
-      saveSettingsAndApply(message.settings, activeTabRequest)
-        .then(sendResponse)
-        .catch(() => {
-          sendResponse({
-            ok: false,
-            saved: false,
-            error: "Could not save or apply the settings."
-          });
-        });
-      return true;
-    }
-
-    if (message?.type !== OPEN_GEMINI_MESSAGE) {
+    const isSave = message?.type === SAVE_SETTINGS_MESSAGE;
+    if (!isSave && message?.type !== OPEN_GEMINI_MESSAGE) {
       return false;
     }
 
-    openGemini()
-      .then(sendResponse)
-      .catch((error) => {
-        sendResponse({
-          ok: false,
-          error: error.message || "Could not open Gemini."
-        });
-      });
+    (async () => {
+      let result;
+      try {
+        result = isSave
+          ? await saveSettingsAndApply(message.settings, captureActiveTab())
+          : await openGemini();
+      } catch {
+        result = isSave
+          ? { ok: false, saved: false, messageKey: "popup_save_or_apply_failed" }
+          : { ok: false, messageKey: "popup_open_gemini_failed" };
+      }
+      sendResponse(result);
+    })();
     return true;
   });
 

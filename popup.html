@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gemini Default Model Selector</title>
+  <title data-i18n="extension_name">Gemini Default Model Selector</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 
@@ -12,59 +12,69 @@
   <main class="popup-shell">
     <header class="header">
       <img class="brand-mark" src="assets/icons/icon-48.png" alt="" aria-hidden="true">
-      <div>
-        <h1>Gemini Default <br>Model Selector</h1>
-      </div>
+      <h1 data-i18n="extension_name"></h1>
     </header>
+    <div id="debug-panel" hidden>
+      <label for="debug-language" data-i18n="popup_debug_language"></label>
+      <select id="debug-language">
+        <option value="" data-i18n="popup_debug_browser_language"></option>
+        <option value="en" lang="en">English</option>
+        <option value="es" lang="es">Español</option>
+        <option value="pt_BR" lang="pt-BR">Português (Brasil)</option>
+        <option value="zh_CN" lang="zh-CN">简体中文</option>
+        <option value="ru" lang="ru">Русский</option>
+      </select>
+    </div>
     <section id="review-prompt" class="review-prompt" hidden>
       <button class="review-stars" type="button" data-review-action="rate"
-        aria-label="Rate the extension in the Chrome Web Store">⭐⭐⭐⭐⭐</button>
-      <p>Like this extension? A quick review helps others discover it.</p>
+        data-i18n-aria-label="popup_review_rate_aria">⭐⭐⭐⭐⭐</button>
+      <p data-i18n="popup_review_prompt"></p>
       <div class="review-actions">
-        <button class="review-rate" type="button" data-review-action="rate">Rate</button>
-        <button type="button" data-review-action="dismiss">Already rated</button>
-        <button type="button" data-review-action="later">Remind me later</button>
+        <button class="review-rate" type="button" data-review-action="rate" data-i18n="popup_review_rate"></button>
+        <button type="button" data-review-action="dismiss" data-i18n="popup_review_rated"></button>
+        <button type="button" data-review-action="later" data-i18n="popup_review_later"></button>
       </div>
       <button class="review-close" type="button" data-review-action="dismiss"
-        aria-label="Dismiss review reminder">×</button>
+        data-i18n-aria-label="popup_review_dismiss_aria">×</button>
       <p id="review-status" class="review-status" role="status"></p>
     </section>
-    <section id="site-access-warning" class="site-access-warning" hidden aria-label="Gemini site access warning">
-      <p> Automatic selection is off. Allow permanent access to gemini.google.com in Chrome. </p>
-      <button id="site-access-settings" class="site-access-settings" type="button"> Open site access settings 👈
-      </button>
+    <section id="site-access-warning" class="site-access-warning" hidden
+      data-i18n-aria-label="popup_site_access_aria">
+      <p data-i18n="popup_site_access_warning"></p>
+      <button id="site-access-settings" class="site-access-settings" type="button"
+        data-i18n="popup_site_access_settings"></button>
     </section>
     <section id="settings-panel">
       <fieldset class="model-list">
-        <legend id="model-list-title" tabindex="-1">Choose the model</legend>
+        <legend id="model-list-title" tabindex="-1" data-i18n="popup_choose_model"></legend>
         <div id="model-options"></div>
       </fieldset>
       <fieldset id="thinking-section" class="thinking-section">
-        <legend>Thinking level<span id="thinking-saved" hidden> (saved)</span></legend>
+        <legend id="thinking-legend" data-i18n="popup_thinking_level"></legend>
         <div class="thinking-grid">
           <label class="thinking-pill">
             <input type="radio" name="thinkingLevel" value="low">
-            <span class="pill-label">Low</span>
+            <span class="pill-label" data-i18n="popup_thinking_low"></span>
           </label>
           <label class="thinking-pill">
             <input type="radio" name="thinkingLevel" value="medium">
-            <span class="pill-label">Medium</span>
+            <span class="pill-label" data-i18n="popup_thinking_medium"></span>
           </label>
           <label class="thinking-pill">
             <input type="radio" name="thinkingLevel" value="high">
-            <span class="pill-label">High</span>
+            <span class="pill-label" data-i18n="popup_thinking_high"></span>
           </label>
         </div>
       </fieldset>
     </section>
-    <p id="status" class="status" role="status" aria-live="polite"> Loading settings… </p>
-    <section class="gemini-shortcut" aria-label="Open Gemini shortcut">
+    <p id="status" class="status" role="status" aria-live="polite" data-i18n="popup_loading"></p>
+    <section class="gemini-shortcut" data-i18n-aria-label="popup_shortcut_aria">
       <button id="open-gemini" class="open-gemini" type="button">
-        <span>Open Gemini</span>
+        <span data-i18n="popup_open_gemini"></span>
         <span id="open-gemini-shortcut">(…)</span>
       </button>
       <button id="open-gemini-shortcut-change" class="shortcut-change" type="button"
-        aria-label="Change Open Gemini keyboard shortcut">Change</button>
+        data-i18n="popup_change_shortcut" data-i18n-aria-label="popup_change_shortcut_aria"></button>
     </section>
   </main>
   <script src="shared.js"></script>

@@ -1,7 +1,16 @@
-(function initializePopup() {
+(async function initializePopup() {
   "use strict";
 
   const core = globalThis.GeminiDefaultModelCore;
+  const preview = core.DEBUG === 1 ? await loadLanguagePreview() : null;
+  const message = (key, substitution) => {
+    const entry = preview?.catalog?.[key];
+    if (!entry) return chrome.i18n.getMessage(key, substitution);
+
+    return entry.message.replace(/\$([a-z_]+)\$/gi, (_, name) =>
+      entry.placeholders[name.toLowerCase()].content.replace("$1", () => substitution ?? "")
+    );
+  };
   const SAVE_SETTINGS_MESSAGE = "GEMINI_SAVE_SETTINGS";
   const OPEN_GEMINI_MESSAGE = "GEMINI_OPEN_NEW_TAB";
   const OPEN_GEMINI_COMMAND = "open-gemini";
@@ -13,7 +22,7 @@
   const settingsPanel = document.querySelector("#settings-panel");
   const modelOptions = document.querySelector("#model-options");
   const thinkingSection = document.querySelector("#thinking-section");
-  const thinkingSaved = document.querySelector("#thinking-saved");
+  const thinkingLegend = document.querySelector("#thinking-legend");
   const openGeminiButton = document.querySelector("#open-gemini");
   const shortcutLabel = document.querySelector("#open-gemini-shortcut");
   const shortcutChangeButton = document.querySelector(
@@ -30,11 +39,51 @@
   let currentGeminiModel = null;
   let catalogRequest = 0;
   let savingReviewChoice = false;
+  document.documentElement.lang = message("popup_language");
+  for (const element of document.querySelectorAll("[data-i18n]")) {
+    element.textContent = message(element.dataset.i18n);
+  }
+  for (const element of document.querySelectorAll("[data-i18n-aria-label]")) {
+    element.setAttribute("aria-label", message(element.dataset.i18nAriaLabel));
+  }
+  if (preview) {
+    document.querySelector("#debug-panel").hidden = false;
+    if (preview.restoreFocus) preview.select.focus();
+  }
   settingsPanel.inert = true;
+
+  async function loadLanguagePreview() {
+    const url = new URL(location.href);
+    const select = document.querySelector("#debug-language");
+    const requestedLocale = url.searchParams.get("previewLocale");
+    select.value = requestedLocale ?? "";
+    let catalog = null;
+
+    if (select.value) {
+      try {
+        const response = await fetch(`_locales/${select.value}/messages.json`);
+        if (response.ok) catalog = await response.json();
+      } catch {
+        // An unreadable preview catalog leaves the browser localization available.
+      }
+    }
+    if (!catalog) select.value = "";
+
+    select.addEventListener("change", () => {
+      url.searchParams.set("previewLocale", select.value);
+      location.replace(url.href);
+    });
+    return { catalog, select, restoreFocus: requestedLocale !== null };
+  }
 
   function setStatus(message, kind = "info") {
     status.textContent = message;
     status.dataset.kind = kind;
+  }
+
+  function showOperationError(result, fallback) {
+    const text = result?.messageKey && message(result.messageKey, result.substitution);
+    setStatus(text || message(fallback), "error");
   }
 
   async function loadReviewPrompt() {
@@ -67,7 +116,7 @@
           : { reviewPromptDismissed: true });
       }
     } catch {
-      reviewStatus.textContent = "Could not save your choice. Try again.";
+      reviewStatus.textContent = message("popup_review_save_failed");
       return;
     } finally {
       savingReviewChoice = false;
@@ -81,23 +130,21 @@
       try {
         await chrome.tabs.create({ url: REVIEW_URL });
       } catch {
-        setStatus("Could not open the Chrome Web Store.", "error");
+        setStatus(message("popup_review_open_failed"), "error");
       }
     }
   });
 
   function setGeminiLinkStatus() {
+    const linkMarker = "\uFFFC";
+    const [before, after = ""] = message("popup_saved_open_gemini", linkMarker).split(linkMarker);
     const link = document.createElement("a");
     link.href = "https://gemini.google.com/";
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     link.textContent = "Gemini";
 
-    status.replaceChildren(
-      document.createTextNode("Saved. Open or refresh "),
-      link,
-      document.createTextNode(" to apply it.")
-    );
+    status.replaceChildren(before, link, after);
     status.dataset.kind = "success";
   }
 
@@ -120,7 +167,8 @@
 
   function updateThinkingAccess(model = selectedCatalogModel()) {
     thinkingSection.disabled = model === "auto";
-    thinkingSaved.hidden = !thinkingSection.disabled;
+    thinkingLegend.textContent = message(thinkingSection.disabled
+      ? "popup_thinking_level_saved" : "popup_thinking_level");
   }
 
   function renderModels() {
@@ -129,7 +177,7 @@
     if (!modelCatalog.length) {
       const empty = document.createElement("p");
       empty.className = "model-list-note";
-      empty.textContent = "Open Gemini to load your available models.";
+      empty.textContent = message("popup_models_empty");
       modelOptions.replaceChildren(empty);
       return;
     }
@@ -153,12 +201,12 @@
       indicator.className = "radio-indicator";
       indicator.setAttribute("aria-hidden", "true");
       copy.className = "model-copy";
-      title.textContent = label;
+      title.textContent = id === "auto" && label === "Auto" ? message("popup_auto_mode") : label;
       copy.append(title);
       if (!available) {
         const note = document.createElement("span");
         note.className = "model-list-note";
-        note.textContent = "Unavailable";
+        note.textContent = message("popup_model_unavailable");
         copy.append(note);
       }
       row.append(input, indicator, copy);
@@ -209,10 +257,10 @@
         (command) => command.name === OPEN_GEMINI_COMMAND
       );
       shortcutLabel.textContent = openCommand?.shortcut
-        ? `(${openCommand.shortcut})`
-        : "(hotkey not set)";
+        ? message("popup_hotkey", openCommand.shortcut)
+        : message("popup_hotkey_not_set");
     } catch {
-      shortcutLabel.textContent = "(hotkey unavailable)";
+      shortcutLabel.textContent = message("popup_hotkey_unavailable");
     }
   }
 
@@ -236,52 +284,49 @@
         setGeminiLinkStatus();
         return;
       }
-      setStatus(result?.error || "Saved, but not applied yet.", "error");
+      showOperationError(result, result?.saved ? "popup_saved_not_applied" : "popup_save_or_apply_failed");
       return;
     }
 
     if (!result.applied) {
-      setStatus("Saved. Gemini is still loading.", "error");
+      setStatus(message("popup_saved_gemini_loading"), "error");
       return;
     }
 
-    setStatus("Saved", "success");
+    setStatus(message("popup_saved"), "success");
   }
 
-  settingsPanel.addEventListener("change", () => {
+  settingsPanel.addEventListener("change", async () => {
     settings = readForm();
     updateThinkingAccess();
     const sequence = ++settingsChangeSequence;
     settingsChanged = true;
-    setStatus("Saving…");
+    setStatus(message("popup_saving"));
     try {
-      Promise.resolve(chrome.runtime.sendMessage({
+      const result = await chrome.runtime.sendMessage({
         type: SAVE_SETTINGS_MESSAGE,
         settings,
         sequence
-      })).then((result) => showSaveResult(result, sequence)).catch(() => {
-        if (sequence === settingsChangeSequence) {
-          setStatus("Could not save the settings. Try reopening the extension.", "error");
-        }
       });
+      showSaveResult(result, sequence);
     } catch {
       if (sequence === settingsChangeSequence) {
-        setStatus("Could not save the settings. Try reopening the extension.", "error");
+        setStatus(message("popup_save_failed_retry"), "error");
       }
     }
   });
 
   openGeminiButton.addEventListener("click", async () => {
-    setStatus("Opening Gemini…");
+    setStatus(message("popup_opening_gemini"));
     try {
       const result = await chrome.runtime.sendMessage({
         type: OPEN_GEMINI_MESSAGE
       });
       if (!result?.ok) {
-        throw new Error(result?.error || "Could not open Gemini.");
+        showOperationError(result, "popup_open_gemini_failed");
       }
-    } catch (error) {
-      setStatus(error.message || "Could not open Gemini.", "error");
+    } catch {
+      setStatus(message("popup_open_gemini_failed"), "error");
     }
   });
 
@@ -289,10 +334,7 @@
     try {
       await chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
     } catch {
-      setStatus(
-        "Open chrome://extensions/shortcuts to change the hotkey.",
-        "info"
-      );
+      setStatus(message("popup_shortcut_settings_fallback", "chrome://extensions/shortcuts"));
     }
   });
 
@@ -302,7 +344,7 @@
         url: `chrome://extensions/?id=${chrome.runtime.id}`
       });
     } catch {
-      setStatus("Could not open extension site access settings.", "error");
+      setStatus(message("popup_site_access_failed"), "error");
     }
   });
 
@@ -326,7 +368,7 @@
     renderModels();
     writeForm(settings);
     settingsPanel.inert = false;
-    setStatus("Changes save automatically");
+    setStatus(message("popup_autosave"));
   });
 
   checkGeminiSiteAccess();

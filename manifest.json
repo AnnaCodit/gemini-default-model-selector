@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Gemini Default Model Selector",
-  "version": "1.4.1",
-  "description": "Set a default Gemini model and thinking level. The model list refreshes from your Gemini menu.",
+  "name": "__MSG_extension_name__",
+  "version": "1.5.1",
+  "default_locale": "en",
+  "description": "__MSG_extension_description__",
   "icons": {
     "16": "assets/icons/icon-16.png",
     "32": "assets/icons/icon-32.png",
@@ -16,7 +17,7 @@
     "https://gemini.google.com/*"
   ],
   "action": {
-    "default_title": "Gemini default model",
+    "default_title": "__MSG_action_title__",
     "default_icon": {
       "16": "assets/icons/icon-16.png",
       "32": "assets/icons/icon-32.png"
@@ -32,7 +33,7 @@
         "default": "Alt+G",
         "mac": "Option+G"
       },
-      "description": "Open Gemini in a new tab"
+      "description": "__MSG_command_open_gemini__"
     }
   },
   "content_scripts": [

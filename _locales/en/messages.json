@@ -1,0 +1,227 @@
+{
+  "extension_name": {
+    "message": "Gemini Default Model Selector",
+    "description": "Name shown in Chrome, the Chrome Web Store, and the popup heading."
+  },
+  "extension_description": {
+    "message": "Set a default Gemini model and thinking level. The model list refreshes from your Gemini menu.",
+    "description": "Short summary for Chrome and the Chrome Web Store (132 characters maximum)."
+  },
+  "action_title": {
+    "message": "Gemini default model"
+  },
+  "command_open_gemini": {
+    "message": "Open Gemini in a new tab"
+  },
+  "popup_language": {
+    "message": "en",
+    "description": "BCP 47 language tag for the popup text, also used when Chrome falls back to this catalog."
+  },
+  "popup_choose_model": {
+    "message": "Choose the model"
+  },
+  "popup_auto_mode": {
+    "message": "Auto",
+    "description": "The automatic model selection mode. Model names read from Gemini otherwise stay as displayed by Gemini."
+  },
+  "popup_models_empty": {
+    "message": "Open Gemini to load your available models."
+  },
+  "popup_model_unavailable": {
+    "message": "Unavailable"
+  },
+  "popup_thinking_level": {
+    "message": "Thinking level"
+  },
+  "popup_thinking_level_saved": {
+    "message": "Thinking level (saved)",
+    "description": "Legend shown when Auto is selected and the saved thinking level cannot currently be applied."
+  },
+  "popup_thinking_low": {
+    "message": "Low"
+  },
+  "popup_thinking_medium": {
+    "message": "Medium"
+  },
+  "popup_thinking_high": {
+    "message": "High"
+  },
+  "popup_review_prompt": {
+    "message": "Like this extension? A quick review helps others discover it."
+  },
+  "popup_review_rate": {
+    "message": "Rate"
+  },
+  "popup_review_rate_aria": {
+    "message": "Rate the extension in the Chrome Web Store",
+    "description": "Accessible name of the review button that displays only stars."
+  },
+  "popup_review_rated": {
+    "message": "Already rated"
+  },
+  "popup_review_later": {
+    "message": "Remind me later"
+  },
+  "popup_review_dismiss_aria": {
+    "message": "Dismiss review reminder",
+    "description": "Accessible name of the close button for the review reminder."
+  },
+  "popup_review_save_failed": {
+    "message": "Could not save your choice. Try again."
+  },
+  "popup_review_open_failed": {
+    "message": "Could not open the Chrome Web Store."
+  },
+  "popup_site_access_aria": {
+    "message": "Gemini site access warning"
+  },
+  "popup_site_access_warning": {
+    "message": "Automatic selection is off. Allow permanent access to gemini.google.com in Chrome."
+  },
+  "popup_site_access_settings": {
+    "message": "Open site access settings 👈"
+  },
+  "popup_site_access_failed": {
+    "message": "Could not open extension site access settings."
+  },
+  "popup_shortcut_aria": {
+    "message": "Open Gemini shortcut"
+  },
+  "popup_open_gemini": {
+    "message": "Open Gemini"
+  },
+  "popup_change_shortcut": {
+    "message": "Change"
+  },
+  "popup_change_shortcut_aria": {
+    "message": "Change the keyboard shortcut for opening Gemini"
+  },
+  "popup_hotkey": {
+    "message": "($SHORTCUT$)",
+    "description": "The parentheses around the keyboard shortcut displayed next to the Open Gemini button.",
+    "placeholders": {
+      "shortcut": {
+        "content": "$1",
+        "example": "Alt+G"
+      }
+    }
+  },
+  "popup_hotkey_not_set": {
+    "message": "(hotkey not set)"
+  },
+  "popup_hotkey_unavailable": {
+    "message": "(hotkey unavailable)"
+  },
+  "popup_shortcut_settings_fallback": {
+    "message": "Open $SETTINGS_URL$ to change the hotkey.",
+    "placeholders": {
+      "settings_url": {
+        "content": "$1",
+        "example": "chrome://extensions/shortcuts"
+      }
+    }
+  },
+  "popup_loading": {
+    "message": "Loading settings…"
+  },
+  "popup_autosave": {
+    "message": "Changes save automatically"
+  },
+  "popup_saving": {
+    "message": "Saving…"
+  },
+  "popup_saved": {
+    "message": "Saved"
+  },
+  "popup_saved_open_gemini": {
+    "message": "Saved. Open or refresh $GEMINI_LINK$ to apply it.",
+    "description": "The Gemini link moves with its placeholder. Use it exactly once and do not add markup.",
+    "placeholders": {
+      "gemini_link": {
+        "content": "$1",
+        "example": "Gemini"
+      }
+    }
+  },
+  "popup_saved_gemini_loading": {
+    "message": "Saved. Gemini is still loading."
+  },
+  "popup_saved_no_active_tab": {
+    "message": "Saved, but the active tab was not found."
+  },
+  "popup_saved_not_applied": {
+    "message": "Saved, but not applied yet."
+  },
+  "popup_save_failed": {
+    "message": "Could not save the settings."
+  },
+  "popup_save_failed_retry": {
+    "message": "Could not save the settings. Try reopening the extension."
+  },
+  "popup_save_or_apply_failed": {
+    "message": "Could not save or apply the settings."
+  },
+  "popup_opening_gemini": {
+    "message": "Opening Gemini…"
+  },
+  "popup_open_gemini_failed": {
+    "message": "Could not open Gemini."
+  },
+  "popup_gemini_not_ready": {
+    "message": "Gemini is not ready yet. Try again once it has loaded."
+  },
+  "popup_apply_failed": {
+    "message": "Could not apply the settings in Gemini."
+  },
+  "popup_apply_saved_model_unavailable": {
+    "message": "Your saved model is unavailable in this Gemini menu."
+  },
+  "popup_apply_model_unavailable": {
+    "message": "$MODEL$ is unavailable for this account. Choose another model.",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_model_not_found": {
+    "message": "Could not find the $MODEL$ model option.",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_model_not_confirmed": {
+    "message": "Gemini did not confirm the $MODEL$ model.",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_thinking_unavailable": {
+    "message": "The requested thinking level is unavailable or could not be verified."
+  },
+  "popup_apply_thinking_not_confirmed": {
+    "message": "Gemini did not confirm the requested thinking level."
+  },
+  "popup_apply_thinking_menu_open": {
+    "message": "Gemini did not close the thinking submenu."
+  },
+  "popup_apply_model_menu_open": {
+    "message": "Gemini did not close the model menu."
+  },
+  "popup_apply_settings_not_confirmed": {
+    "message": "Gemini did not confirm the final model settings."
+  },
+  "popup_debug_language": {
+    "message": "Preview language"
+  },
+  "popup_debug_browser_language": {
+    "message": "Browser language"
+  }
+}

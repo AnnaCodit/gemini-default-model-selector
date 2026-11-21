@@ -1349,7 +1349,7 @@ test("a menu that never closes in time cannot produce success or take focus from
   const focusCount = page.focusTimes.filter((event) => event.target === "TEXTAREA").length;
   const result = await page.apply({ thinkingLevel: "medium" });
   assert.equal(result.ok, false);
-  assert.match(result.error, /did not close/);
+  assert.equal(result.messageKey, "popup_apply_model_menu_open");
   assert.equal(page.focusTimes.filter((event) => event.target === "TEXTAREA").length, focusCount);
   assert.equal(page.activeObservers(), 0);
 });
@@ -1519,7 +1519,7 @@ test("incomplete radio groups are not treated as a legacy toggle", async () => {
 test("unavailable levels fail without clicking a disabled item", async () => {
   const page = loadContent({ disabledLevel: "high" });
   await page.start();
-  assert(page.errors.some((message) => message.includes("not available")));
+  assert(page.errors.some((message) => message.includes("popup_apply_thinking_unavailable")));
   assert(!page.clicks.includes("high"));
 });
 
@@ -1725,7 +1725,8 @@ for (const modelBlocker of ["aria-disabled", "disabled", "nested-disabled", "loc
     const request = page.send({ model: "carbon-4", thinkingLevel: "high" });
     await page.runUntil(request.done);
     assert.equal(request.response().ok, false);
-    assert.match(request.response().error, /4 Carbon is unavailable for this account/);
+    assert.equal(request.response().messageKey, "popup_apply_model_unavailable");
+    assert.equal(request.response().substitution, "4 Carbon");
     assert.deepEqual(page.state(), { model: "flash-3.8", level: "medium", menuOpen: false });
     assert.deepEqual(page.clicks, ["picker"]);
     assert.equal(page.document.activeElement, page.editor);
@@ -1738,7 +1739,7 @@ test("a locked primary model does not silently switch to its older fallback", as
   const page = loadContent({ availableModels: ["flash-3.8", "flash-3.7", "pro-3.1"],
     initialModel: "pro-3.1", disabledModel: "flash-3.8", modelBlocker: "lock-icon" });
   await page.start();
-  assert(page.errors.some((message) => message.includes("3.8 Flash is unavailable")));
+  assert(page.errors.some((message) => message.includes("popup_apply_model_unavailable: 3.8 Flash")));
   assert.deepEqual(page.clicks, ["picker"]);
   assert.equal(page.state().model, "pro-3.1");
 });
@@ -1776,7 +1777,7 @@ test("Carbon missing from the old menu fails once and keeps the current settings
   const page = loadContent({ legacy: true, initialLevel: "low",
     stored: { model: "carbon-4", thinkingLevel: "high" } });
   await page.start();
-  assert(page.errors.some((message) => message.includes("Could not find the 4 Carbon")));
+  assert(page.errors.some((message) => message.includes("popup_apply_model_not_found: 4 Carbon")));
   assert.deepEqual(page.state(), { model: "flash-3.8", level: "low", menuOpen: false });
   assert.deepEqual(page.clicks, ["picker"]);
   assert.equal(page.pendingTimers(), 0);

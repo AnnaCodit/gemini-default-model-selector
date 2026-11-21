@@ -35,6 +35,15 @@
   let lastModeMenu = null;
   let modelCatalog = [];
 
+  class ApplyError extends Error {
+    constructor(messageKey, { substitution, retryable = true } = {}) {
+      super(substitution ? `${messageKey}: ${substitution}` : messageKey);
+      this.messageKey = messageKey;
+      this.substitution = substitution;
+      this.retryable = retryable;
+    }
+  }
+
   function isVisible(element) {
     if (!(element instanceof HTMLElement)) {
       return false;
@@ -593,7 +602,7 @@
       const closed = await waitFor(() => !isVisible(submenu), timeoutMs, 0, isCancelled);
       if (isCancelled?.()) return;
       if (!closed) {
-        throw new Error("Gemini did not close the thinking submenu.");
+        throw new ApplyError("popup_apply_thinking_menu_open");
       }
     }
     if (isCancelled?.()) return;
@@ -609,7 +618,7 @@
     const closed = await waitFor(() => isModeMenuClosed(menu), timeoutMs, 0, isCancelled);
     if (isCancelled?.()) return;
     if (!closed) {
-      throw new Error("Gemini did not close the mode menu.");
+      throw new ApplyError("popup_apply_model_menu_open");
     }
   }
 
@@ -731,7 +740,7 @@
   async function selectModel(modelId, targetLevel, timeoutMs = UI_TIMEOUT_MS, isCancelled) {
     const model = modelCatalog.find(({ id }) => id === modelId) || core.getModel(modelId);
     if (!model) {
-      throw Object.assign(new Error("Your saved model is unavailable in this Gemini menu."), {
+      throw new ApplyError("popup_apply_saved_model_unavailable", {
         retryable: false
       });
     }
@@ -758,11 +767,13 @@
       if (!selection) {
         const unavailable = findModelOption(getVisibleMenuItems(), model);
         if (unavailable && !isModelOptionEnabled(unavailable.item)) {
-          throw Object.assign(new Error(
-            `${unavailable.model.label} is unavailable for this account. Choose another model.`
-          ), { retryable: false });
+          throw new ApplyError("popup_apply_model_unavailable", {
+            substitution: unavailable.model.label, retryable: false
+          });
         }
-        throw Object.assign(new Error(`Could not find the ${model.label} model option.`), { retryable: false });
+        throw new ApplyError("popup_apply_model_not_found", {
+          substitution: model.label, retryable: false
+        });
       }
       const effectiveModel = selection.model;
 
@@ -782,11 +793,11 @@
       if (!menuItem) {
         const item = findMenuItem(getVisibleMenuItems(), effectiveModel);
         if (item && !isModelOptionEnabled(item)) {
-          throw Object.assign(new Error(
-            `${effectiveModel.label} is unavailable for this account. Choose another model.`
-          ), { retryable: false });
+          throw new ApplyError("popup_apply_model_unavailable", {
+            substitution: effectiveModel.label, retryable: false
+          });
         }
-        throw new Error(`Could not find the ${effectiveModel.label} model option.`);
+        throw new ApplyError("popup_apply_model_not_found", { substitution: effectiveModel.label });
       }
       ensureApplicationActive(isCancelled);
       menuItem.click();
@@ -804,12 +815,12 @@
       }
     }
 
-    throw new Error(`Gemini did not confirm the ${model.label} model.`);
+    throw new ApplyError("popup_apply_model_not_confirmed", { substitution: model.label });
   }
 
   async function setThinkingLevel(targetLevel, timeoutMs = UI_TIMEOUT_MS, isCancelled) {
     if (!await openThinkingMenu(timeoutMs, isCancelled)) {
-      throw new Error("The requested thinking level is not available or could not be verified.");
+      throw new ApplyError("popup_apply_thinking_unavailable");
     }
     const ready = await waitFor(() => {
       const info = getVisibleThinkingMenuInfo();
@@ -828,7 +839,7 @@
       const targetItem = info?.items[info.kind === "legacy" ? 0 : core.THINKING_LEVELS.indexOf(targetLevel)];
       const unavailable = confirmation && targetItem && !isControlEnabled(targetItem);
       const ambiguous = confirmation?.kind === "levels" && !confirmation.targetLabel;
-      throw Object.assign(new Error("The requested thinking level is not available or could not be verified."), {
+      throw new ApplyError("popup_apply_thinking_unavailable", {
         retryable: !unavailable && !ambiguous
       });
     }
@@ -839,7 +850,7 @@
       // состояние меню или бейдж после естественного закрытия, а не старый DOM-пункт.
       const committed = await waitFor(() => matchesThinkingConfirmation(ready.confirmation),
         timeoutMs, 0, isCancelled);
-      if (!committed) throw new Error("Gemini did not confirm the requested thinking level.");
+      if (!committed) throw new ApplyError("popup_apply_thinking_not_confirmed");
     }
     return { changed: !ready.selected, confirmation: ready.confirmation };
   }
@@ -906,7 +917,7 @@
             }
             return { applied: true, changed };
           }
-          throw new Error("Gemini did not confirm the final model settings.");
+          throw new ApplyError("popup_apply_settings_not_confirmed");
         } catch (error) {
           if (options.isCancelled?.() || error.retryable === false ||
               attempt === MAX_INTERACTION_ATTEMPTS - 1) throw error;
@@ -920,7 +931,7 @@
           await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
         }
       }
-      throw new Error("Gemini did not confirm the final model settings.");
+      throw new ApplyError("popup_apply_settings_not_confirmed");
     } catch (error) {
       if (options.isCancelled?.()) return { applied: false, cancelled: true, reason: error.message };
       throw error;
@@ -1194,12 +1205,23 @@
           return result;
         }, () => enqueueApply(options))
         : enqueueApply(options);
-      request
-        .then((result) => {
+      (async () => {
+        let response;
+        try {
+          const result = await request;
           completeInitialApplication(result);
-          sendResponse({ ok: true, ...result });
-        })
-        .catch((error) => sendResponse({ ok: false, error: error.message }));
+          response = { ok: true, ...result };
+        } catch (error) {
+          response = error instanceof ApplyError
+            ? {
+              ok: false,
+              messageKey: error.messageKey,
+              substitution: error.substitution
+            }
+            : { ok: false, messageKey: "popup_apply_failed" };
+        }
+        sendResponse(response);
+      })();
       return true;
     }
 

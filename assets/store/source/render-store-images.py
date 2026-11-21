@@ -46,10 +46,17 @@ def capture_popup(browser, theme, model, thinking_level):
     # The isolated capture uses example preferences, never the user's browser profile.
     # Only read APIs are mocked; saving or applying preferences is not simulated.
     page = context.new_page()
-    example = {"model": model, "thinkingLevel": thinking_level, "catalog": EXAMPLE_CATALOG}
-    page.add_init_script("""
-        const { model, thinkingLevel, catalog } = EXAMPLE;
+    messages = json.loads((PROJECT_DIR / "_locales/en/messages.json").read_text(encoding="utf-8"))
+    example = {"model": model, "thinkingLevel": thinking_level, "catalog": EXAMPLE_CATALOG,
+               "messages": messages}
+    page.add_init_script(r"""
+        const { model, thinkingLevel, catalog, messages } = EXAMPLE;
         globalThis.chrome = {
+          i18n: { getMessage(key, substitution) {
+            return messages[key].message.replace(/\$([a-z_]+)\$/gi, (_, name) =>
+              messages[key].placeholders[name.toLowerCase()].content.replace("$1", () => substitution)
+            );
+          } },
           runtime: {},
           storage: {
             local: { get(_key, callback) { callback({ modelCatalog: catalog }); } },

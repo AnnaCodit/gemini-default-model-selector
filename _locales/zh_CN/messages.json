@@ -1,0 +1,218 @@
+{
+  "extension_name": {
+    "message": "Gemini 默认模型选择器"
+  },
+  "extension_description": {
+    "message": "为 Gemini 设置默认模型和思考级别。模型列表会根据 Gemini 菜单自动更新。"
+  },
+  "action_title": {
+    "message": "Gemini 默认模型"
+  },
+  "command_open_gemini": {
+    "message": "在新标签页中打开 Gemini"
+  },
+  "popup_language": {
+    "message": "zh-CN"
+  },
+  "popup_choose_model": {
+    "message": "选择模型"
+  },
+  "popup_auto_mode": {
+    "message": "自动"
+  },
+  "popup_models_empty": {
+    "message": "打开 Gemini 以加载可用模型。"
+  },
+  "popup_model_unavailable": {
+    "message": "不可用"
+  },
+  "popup_thinking_level": {
+    "message": "思考级别"
+  },
+  "popup_thinking_level_saved": {
+    "message": "思考级别（已保存）"
+  },
+  "popup_thinking_low": {
+    "message": "低"
+  },
+  "popup_thinking_medium": {
+    "message": "中"
+  },
+  "popup_thinking_high": {
+    "message": "高"
+  },
+  "popup_review_prompt": {
+    "message": "喜欢这款扩展吗？留个评价，帮助更多人发现它。"
+  },
+  "popup_review_rate": {
+    "message": "评价"
+  },
+  "popup_review_rate_aria": {
+    "message": "在 Chrome 应用商店评价此扩展"
+  },
+  "popup_review_rated": {
+    "message": "已评价"
+  },
+  "popup_review_later": {
+    "message": "稍后提醒我"
+  },
+  "popup_review_dismiss_aria": {
+    "message": "关闭评价提醒"
+  },
+  "popup_review_save_failed": {
+    "message": "无法保存你的选择。请重试。"
+  },
+  "popup_review_open_failed": {
+    "message": "无法打开 Chrome 应用商店。"
+  },
+  "popup_site_access_aria": {
+    "message": "Gemini 网站访问权限提醒"
+  },
+  "popup_site_access_warning": {
+    "message": "自动选择已关闭。请在 Chrome 中始终允许此扩展访问 gemini.google.com。"
+  },
+  "popup_site_access_settings": {
+    "message": "打开网站访问权限设置 👈"
+  },
+  "popup_site_access_failed": {
+    "message": "无法打开扩展的网站访问权限设置。"
+  },
+  "popup_shortcut_aria": {
+    "message": "打开 Gemini 的快捷键"
+  },
+  "popup_open_gemini": {
+    "message": "打开 Gemini"
+  },
+  "popup_change_shortcut": {
+    "message": "更改"
+  },
+  "popup_change_shortcut_aria": {
+    "message": "更改打开 Gemini 的快捷键"
+  },
+  "popup_hotkey": {
+    "message": "（$SHORTCUT$）",
+    "placeholders": {
+      "shortcut": {
+        "content": "$1",
+        "example": "Alt+G"
+      }
+    }
+  },
+  "popup_hotkey_not_set": {
+    "message": "（未设置快捷键）"
+  },
+  "popup_hotkey_unavailable": {
+    "message": "（快捷键不可用）"
+  },
+  "popup_shortcut_settings_fallback": {
+    "message": "请打开 $SETTINGS_URL$ 更改快捷键。",
+    "placeholders": {
+      "settings_url": {
+        "content": "$1",
+        "example": "chrome://extensions/shortcuts"
+      }
+    }
+  },
+  "popup_loading": {
+    "message": "正在加载设置…"
+  },
+  "popup_autosave": {
+    "message": "更改会自动保存"
+  },
+  "popup_saving": {
+    "message": "正在保存…"
+  },
+  "popup_saved": {
+    "message": "已保存"
+  },
+  "popup_saved_open_gemini": {
+    "message": "已保存。要应用更改，请打开或刷新 $GEMINI_LINK$。",
+    "placeholders": {
+      "gemini_link": {
+        "content": "$1",
+        "example": "Gemini"
+      }
+    }
+  },
+  "popup_saved_gemini_loading": {
+    "message": "已保存。Gemini 仍在加载。"
+  },
+  "popup_saved_no_active_tab": {
+    "message": "已保存，但找不到当前标签页。"
+  },
+  "popup_saved_not_applied": {
+    "message": "已保存，尚未应用。"
+  },
+  "popup_save_failed": {
+    "message": "无法保存设置。"
+  },
+  "popup_save_failed_retry": {
+    "message": "无法保存设置。请重新打开扩展后再试。"
+  },
+  "popup_save_or_apply_failed": {
+    "message": "无法保存或应用设置。"
+  },
+  "popup_opening_gemini": {
+    "message": "正在打开 Gemini…"
+  },
+  "popup_open_gemini_failed": {
+    "message": "无法打开 Gemini。"
+  },
+  "popup_gemini_not_ready": {
+    "message": "Gemini 尚未准备就绪。请在加载完成后重试。"
+  },
+  "popup_apply_failed": {
+    "message": "无法在 Gemini 中应用设置。"
+  },
+  "popup_apply_saved_model_unavailable": {
+    "message": "已保存的模型在此 Gemini 菜单中不可用。"
+  },
+  "popup_apply_model_unavailable": {
+    "message": "此账号无法使用 $MODEL$。请选择其他模型。",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_model_not_found": {
+    "message": "在菜单中找不到模型 $MODEL$。",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_model_not_confirmed": {
+    "message": "Gemini 未确认已选择模型 $MODEL$。",
+    "placeholders": {
+      "model": {
+        "content": "$1",
+        "example": "4 Carbon"
+      }
+    }
+  },
+  "popup_apply_thinking_unavailable": {
+    "message": "所选思考级别不可用或无法验证。"
+  },
+  "popup_apply_thinking_not_confirmed": {
+    "message": "Gemini 未确认所选思考级别。"
+  },
+  "popup_apply_thinking_menu_open": {
+    "message": "Gemini 未关闭思考级别子菜单。"
+  },
+  "popup_apply_model_menu_open": {
+    "message": "Gemini 未关闭模型菜单。"
+  },
+  "popup_apply_settings_not_confirmed": {
+    "message": "Gemini 未确认最终模型设置。"
+  },
+  "popup_debug_language": {
+    "message": "预览语言"
+  },
+  "popup_debug_browser_language": {
+    "message": "浏览器语言"
+  }
+}

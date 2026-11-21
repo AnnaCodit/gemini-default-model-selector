@@ -3,6 +3,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
+const englishMessages = require("../_locales/en/messages.json");
+const chineseMessages = require("../_locales/zh_CN/messages.json");
 
 const sharedSource = fs.readFileSync(
   path.join(__dirname, "..", "shared.js"),
@@ -28,6 +30,7 @@ function createPopupMock(initialStorage = {}, options = {}) {
   const tabCreates = [];
   const models = [];
   const local = { ...options.local };
+  const messages = options.messages ?? englishMessages;
   let storageListener;
 
   // Simple DOM simulation
@@ -75,7 +78,7 @@ function createPopupMock(initialStorage = {}, options = {}) {
       }
     },
     "#thinking-section": { disabled: false },
-    "#thinking-saved": { hidden: true },
+    "#thinking-legend": { textContent: "" },
     "#open-gemini-shortcut": { textContent: "" },
     "#open-gemini-shortcut-change": { addEventListener() {} },
     "#site-access-settings": {
@@ -97,6 +100,14 @@ function createPopupMock(initialStorage = {}, options = {}) {
   ];
 
   const chrome = {
+    i18n: {
+      getMessage(key, substitution) {
+        const entry = messages[key] ?? englishMessages[key];
+        return entry?.message.replace(/\$([a-z_]+)\$/gi, (_, name) =>
+          entry.placeholders[name.toLowerCase()].content.replace("$1", () => substitution ?? "")
+        ) ?? "";
+      }
+    },
     commands: {
       async getAll() {
         return [{ name: "open-gemini", shortcut: "Ctrl+Shift+G" }];
@@ -160,18 +171,17 @@ function createPopupMock(initialStorage = {}, options = {}) {
   };
 
   const document = {
+    documentElement: {},
     querySelector(sel) {
       return elements[sel] || null;
     },
+    querySelectorAll() { return []; },
     createElement() {
       return {
         href: "", target: "", rel: "", textContent: "", children: [],
         setAttribute() {},
         append(...children) { this.children.push(...children); }
       };
-    },
-    createTextNode(t) {
-      return t;
     }
   };
 
@@ -526,7 +536,7 @@ test("a late storage read cannot replace a setting changed in the popup", () => 
 
 test("shows a clear status when the worker reports a storage error", async () => {
   const mock = createPopupMock({}, {
-    runtimeResponse: { ok: false, saved: false, error: "Could not save the settings." }
+    runtimeResponse: { ok: false, saved: false, messageKey: "popup_save_failed" }
   });
   mock.thinkings.forEach((item) => (item.checked = item.value === "medium"));
   mock.panel.trigger("change");
@@ -549,8 +559,7 @@ test("preserves the Gemini link status returned by the worker", async () => {
     runtimeResponse: {
       ok: false,
       saved: true,
-      showGeminiLink: true,
-      error: "Saved. Open or refresh Gemini to apply it."
+      showGeminiLink: true
     }
   });
   mock.thinkings.forEach((item) => (item.checked = item.value === "high"));
@@ -559,6 +568,37 @@ test("preserves the Gemini link status returned by the worker", async () => {
   await waitFor(() => mock.status.children.length === 3);
   assert.equal(mock.status.children[1].textContent, "Gemini");
   assert.equal(mock.status.dataset.kind, "success");
+});
+
+test("places the Gemini link inside the full translated status", async () => {
+  const mock = createPopupMock({}, {
+    messages: chineseMessages,
+    runtimeResponse: { ok: false, saved: true, showGeminiLink: true }
+  });
+  mock.panel.trigger("change");
+  await waitFor(() => mock.status.children.length === 3);
+
+  const [before, link, after] = mock.status.children;
+  assert.equal(link.href, "https://gemini.google.com/");
+  assert.equal(before + link.textContent + after, "已保存。要应用更改，请打开或刷新 Gemini。");
+});
+
+test("localizes model failures and keeps unknown worker errors out of the popup", async () => {
+  for (const [messageKey, expected] of [
+    ["popup_apply_model_unavailable", "此账号无法使用 4 Carbon。请选择其他模型。"],
+    ["unknown_failure", "已保存，尚未应用。"]
+  ]) {
+    const mock = createPopupMock({}, {
+      messages: chineseMessages,
+      runtimeResponse: {
+        ok: false, saved: true, messageKey, substitution: "4 Carbon",
+        error: "Unlocalized Chrome API error"
+      }
+    });
+    mock.panel.trigger("change");
+    await waitFor(() => mock.status.dataset.kind === "error");
+    assert.equal(mock.status.textContent, expected);
+  }
 });
 
 test("saves the Argon model and applies it to the active tab", async () => {
